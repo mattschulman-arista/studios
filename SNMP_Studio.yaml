@@ -1,0 +1,772 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: 6fb1eb7c-d6b5-4349-be1f-3f86912d18d2
+        workspace_id: ''
+      created_at: '2025-08-01T20:07:50.451Z'
+      created_by: mschulman
+      last_modified_at: '2025-08-04T15:20:41.165Z'
+      last_modified_by: mschulman
+      display_name: SNMP Studio
+      description: Studio for configuring SNMP v1 and v2 communities and trap hosts
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: |-
+          % if devicesResolver:
+              <% snmpGroup = devicesResolver.resolve()["snmpGroup"] %>
+              <% ctx.info(f"SNMP Group: {snmpGroup}")%>
+              % if snmpGroup:
+                  <% communities = snmpGroup["snmpCommunities"] %>
+                  <% ctx.info(f"SNMP Communities: {communities}") %>
+                  % if snmpGroup['snmpAcls']:
+                      % for acl in snmpGroup['snmpAcls']:
+          ip access-list standard ${acl.aclName}
+                          % for aclLine in acl.aclLines:
+                              % if aclLine.permitDenyRemark != "remark":
+                                  % if aclLine.anySource:
+                                      % if aclLine.log:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any log
+                                      % else:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any
+                                      % endif
+                                  % elif aclLine.isHost:
+                                      % if aclLine.log:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP} log
+                                      % else:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP}
+                                      % endif
+                                  % else:
+                                      % if aclLine.log:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask} log
+                                      % else:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask}
+                                      % endif
+                                  % endif
+                              % else:
+           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.description} 
+                              % endif
+                          % endfor
+                      % endfor 
+                  % endif
+                  % for community in communities:
+                      <%
+                          communityName = community.snmpCommunityName
+                          if community.snmpCommunityMode:
+                              communityMode = community.snmpCommunityMode
+                          if community.snmpCommunityAcl:
+                              communityACL = community.snmpCommunityAcl
+                      %>
+                      % if community.snmpCommunityName:
+          snmp-server community ${communityName}\
+                          % if community.snmpCommunityMode:
+           ${communityMode}\
+                          % endif
+                          % if community.snmpCommunityAcl:
+           ${communityACL}
+                          % endif
+                      % endif
+                  % endfor
+                  % if snmpGroup.snmpLocation:
+          snmp-server location ${snmpGroup.snmpLocation}
+                  % endif
+                  % if snmpGroup.snmpContact:
+          snmp-server contact ${snmpGroup.snmpContact}
+                  % endif
+                  % if snmpGroup.snmpTrapHosts:
+                      <% trapHosts = snmpGroup.snmpTrapHosts %>
+                      <% ctx.info(f"SNMP Traps: {trapHosts}") %>
+                      % for trapHost in trapHosts:
+                          % if trapHost.snmpTrapHost:
+          snmp-server host ${trapHost.snmpTrapHost} \
+                              % if trapHost.snmpTrapVersion:
+           version ${trapHost.snmpTrapVersion} \
+                              % endif
+                              % if trapHost.snmpTrapCommunity and trapHost.snmpTrapPort:
+           ${trapHost.snmpTrapCommunity} \
+                              % else:
+           ${trapHost.snmpTrapCommunity}   
+                              % endif
+                              % if trapHost.snmpTrapPort:
+           udp-port ${trapHost.snmpTrapPort}
+                              % endif
+                          % endif
+                      % endfor
+                  % endif
+          ${snmpGroup.get("snmpCli")}
+              % endif
+          % endif
+                      
+      input_schema:
+        fields:
+          values:
+            a2ad4c9d-3787-4613-ae8e-87e2d100785b:
+              id: a2ad4c9d-3787-4613-ae8e-87e2d100785b
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpAcls
+              label: SNMP ACLs
+              description: Create Standard IP ACLs to use with Communities
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
+                key: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            808ebda1-fdc2-49e0-bdb3-3e1f3aa09278:
+              id: 808ebda1-fdc2-49e0-bdb3-3e1f3aa09278
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpCli
+              label: SNMP CLI
+              description: Enter other EOS CLI commands related to SNMP here
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            cfd30967-3078-46ce-8786-aad461584527:
+              id: cfd30967-3078-46ce-8786-aad461584527
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapVersion
+              label: SNMP Trap Version
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - '1'
+                    - '2'
+                    - 2c
+                    - '3'
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            268188c9-f633-4ac2-bca2-8e3232689bdc:
+              id: 268188c9-f633-4ac2-bca2-8e3232689bdc
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpCommunityMode
+              label: SNMP Community Mode
+              description: Read or Read-Write Community
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - ro
+                    - rw
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a3c585c6-a656-42bc-98af-0c09fb4a4606:
+              id: a3c585c6-a656-42bc-98af-0c09fb4a4606
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: log
+              label: Log
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6120a2cb-96ec-4180-939c-53637e390644:
+              id: 6120a2cb-96ec-4180-939c-53637e390644
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDenyRemark
+              label: Permit Deny Remark
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                    - remark
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            57a560a1-f7b2-4263-8850-821383cb0f7d:
+              id: 57a560a1-f7b2-4263-8850-821383cb0f7d
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpContact
+              label: SNMP Contact
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            85838f5c-46cf-43a0-b4d0-dce1638df6b9:
+              id: 85838f5c-46cf-43a0-b4d0-dce1638df6b9
+              type: INPUT_FIELD_TYPE_STRING
+              name: wildcardMask
+              label: Wildcard Mask
+              description: Wildcard mask if source is a network address and was not input in CIDR notation
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            56280cfb-2dc1-43e4-9edf-20efd514f2b8:
+              id: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
+              type: INPUT_FIELD_TYPE_STRING
+              name: aclName
+              label: ACL Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 286944d8-82ed-432b-9930-0a1c5ebcde3d
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            19f3efe2-d9e3-4a10-8714-07c7dc044787:
+              id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
+              type: INPUT_FIELD_TYPE_GROUP
+              name: aclGroup
+              label: ACL Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 56280cfb-2dc1-43e4-9edf-20efd514f2b8
+                    - 324c2c71-1a9f-4700-93ee-be3079b0132c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7dd5d144-186b-4326-990d-54ff2d4ea7c9:
+              id: 7dd5d144-186b-4326-990d-54ff2d4ea7c9
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpTrapHosts
+              label: SNMP Trap Hosts
+              description: Trap Host Destinations
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 7800d51f-ee30-4759-a72f-aab4c92b7002
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0730fb63-ad5d-4079-99b4-b39bf9e55ec9:
+              id: 0730fb63-ad5d-4079-99b4-b39bf9e55ec9
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: anySource
+              label: Any Source
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e7e67b15-9f24-421d-923f-68c6b7a3b909:
+              id: e7e67b15-9f24-421d-923f-68c6b7a3b909
+              type: INPUT_FIELD_TYPE_GROUP
+              name: snmpGroup
+              label: Edit SNMP Config
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 039a73a0-937e-488d-8864-cdaf0492e58e
+                    - 7dd5d144-186b-4326-990d-54ff2d4ea7c9
+                    - 808ebda1-fdc2-49e0-bdb3-3e1f3aa09278
+                    - a2ad4c9d-3787-4613-ae8e-87e2d100785b
+                    - 3ad46aec-bf33-41a3-bcbc-4cbf64f75050
+                    - 57a560a1-f7b2-4263-8850-821383cb0f7d
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            4a4d15ca-b21e-44e9-9b85-d71e518fe4ad:
+              id: 4a4d15ca-b21e-44e9-9b85-d71e518fe4ad
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: isHost
+              label: Is Host
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3e09430d-5fa1-45af-860a-e425a8e14c58:
+              id: 3e09430d-5fa1-45af-860a-e425a8e14c58
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: seqNumber
+              label: Seq Number
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7800d51f-ee30-4759-a72f-aab4c92b7002:
+              id: 7800d51f-ee30-4759-a72f-aab4c92b7002
+              type: INPUT_FIELD_TYPE_GROUP
+              name: snmpTrapHostsGroup
+              label: SNMP Trap Hosts Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 70643c75-d4b9-4082-8b68-bf16023fd0ef
+                    - cfd30967-3078-46ce-8786-aad461584527
+                    - c5a2ea14-8fc3-4b5c-bb22-e1722c8fd498
+                    - f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            44f78d39-f5a4-4aae-b68b-3194a61b7ef5:
+              id: 44f78d39-f5a4-4aae-b68b-3194a61b7ef5
+              type: INPUT_FIELD_TYPE_STRING
+              name: description
+              label: Description
+              description: Remark Description
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            70643c75-d4b9-4082-8b68-bf16023fd0ef:
+              id: 70643c75-d4b9-4082-8b68-bf16023fd0ef
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapHost
+              label: SNMP Trap Host
+              description: IP of the Trap Host
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            324c2c71-1a9f-4700-93ee-be3079b0132c:
+              id: 324c2c71-1a9f-4700-93ee-be3079b0132c
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: aclLines
+              label: ACL Lines
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            77e2d392-c39c-4df3-9b91-c6b674c3631c:
+              id: 77e2d392-c39c-4df3-9b91-c6b674c3631c
+              type: INPUT_FIELD_TYPE_STRING
+              name: sourceIP
+              label: Source
+              description: Source IP/Network.  If a network, can be input in CIDR notation or use the Wildcard mask field.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            020dc026-e59f-4656-a3c9-eec998727f79:
+              id: 020dc026-e59f-4656-a3c9-eec998727f79
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpCommunityAcl
+              label: SNMP Community ACL
+              description: Limit access to the community with an ACL
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            286944d8-82ed-432b-9930-0a1c5ebcde3d:
+              id: 286944d8-82ed-432b-9930-0a1c5ebcde3d
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: devicesResolver
+              label: Devices
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: e7e67b15-9f24-421d-923f-68c6b7a3b909
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f7cf96f2-c563-4bd4-b5b1-5b391b7bb381:
+              id: f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: snmpTrapPort
+              label: SNMP Trap Port
+              description: The UDP Port to send the Trap on if different than 162
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            039a73a0-937e-488d-8864-cdaf0492e58e:
+              id: 039a73a0-937e-488d-8864-cdaf0492e58e
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpCommunities
+              label: SNMP Communities
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 45547a1f-9e36-4ad9-bbaf-02b3c08e27e3
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d:
+              id: e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: seqNumberGroup
+              label: Seq Number Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 3e09430d-5fa1-45af-860a-e425a8e14c58
+                    - 6120a2cb-96ec-4180-939c-53637e390644
+                    - 4a4d15ca-b21e-44e9-9b85-d71e518fe4ad
+                    - 77e2d392-c39c-4df3-9b91-c6b674c3631c
+                    - 85838f5c-46cf-43a0-b4d0-dce1638df6b9
+                    - 44f78d39-f5a4-4aae-b68b-3194a61b7ef5
+                    - a3c585c6-a656-42bc-98af-0c09fb4a4606
+                    - 0730fb63-ad5d-4079-99b4-b39bf9e55ec9
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            45547a1f-9e36-4ad9-bbaf-02b3c08e27e3:
+              id: 45547a1f-9e36-4ad9-bbaf-02b3c08e27e3
+              type: INPUT_FIELD_TYPE_GROUP
+              name: snmpCommunitiesGroup
+              label: SNMP Communities Group
+              description: Group of members for SNMP Communities
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 626797cc-41e8-4d99-a6f2-e831a4d53d08
+                    - 268188c9-f633-4ac2-bca2-8e3232689bdc
+                    - 020dc026-e59f-4656-a3c9-eec998727f79
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c5a2ea14-8fc3-4b5c-bb22-e1722c8fd498:
+              id: c5a2ea14-8fc3-4b5c-bb22-e1722c8fd498
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapCommunity
+              label: SNMP Trap Community / Username
+              description: The SNMP Community or Username to use for the trap
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            626797cc-41e8-4d99-a6f2-e831a4d53d08:
+              id: 626797cc-41e8-4d99-a6f2-e831a4d53d08
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpCommunityName
+              label: SNMP Community String
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3ad46aec-bf33-41a3-bcbc-4cbf64f75050:
+              id: 3ad46aec-bf33-41a3-bcbc-4cbf64f75050
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpLocation
+              label: SNMP Location
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"286944d8-82ed-432b-9930-0a1c5ebcde3d":{"key":"286944d8-82ed-432b-9930-0a1c5ebcde3d","type":"INPUT","isPageLayout":true},"7dd5d144-186b-4326-990d-54ff2d4ea7c9":{"key":"7dd5d144-186b-4326-990d-54ff2d4ea7c9","type":"INPUT"},"808ebda1-fdc2-49e0-bdb3-3e1f3aa09278":{"key":"808ebda1-fdc2-49e0-bdb3-3e1f3aa09278","type":"INPUT","isMultiLine":true,"syntax":"aristaConfig"},"a2ad4c9d-3787-4613-ae8e-87e2d100785b":{"key":"a2ad4c9d-3787-4613-ae8e-87e2d100785b","type":"INPUT","isPageLayout":true},"e7e67b15-9f24-421d-923f-68c6b7a3b909":{"key":"e7e67b15-9f24-421d-923f-68c6b7a3b909","type":"INPUT","order":["3ad46aec-bf33-41a3-bcbc-4cbf64f75050","57a560a1-f7b2-4263-8850-821383cb0f7d","039a73a0-937e-488d-8864-cdaf0492e58e","a2ad4c9d-3787-4613-ae8e-87e2d100785b","7dd5d144-186b-4326-990d-54ff2d4ea7c9","808ebda1-fdc2-49e0-bdb3-3e1f3aa09278"]},"85838f5c-46cf-43a0-b4d0-dce1638df6b9":{"key":"85838f5c-46cf-43a0-b4d0-dce1638df6b9","dependency":{"4a4d15ca-b21e-44e9-9b85-d71e518fe4ad":{"value":[true],"mode":"HIDE"},"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"HIDE"},"0730fb63-ad5d-4079-99b4-b39bf9e55ec9":{"value":[true],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"44f78d39-f5a4-4aae-b68b-3194a61b7ef5":{"key":"44f78d39-f5a4-4aae-b68b-3194a61b7ef5","dependency":{"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d":{"key":"e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d","type":"INPUT","order":["3e09430d-5fa1-45af-860a-e425a8e14c58","6120a2cb-96ec-4180-939c-53637e390644","44f78d39-f5a4-4aae-b68b-3194a61b7ef5","0730fb63-ad5d-4079-99b4-b39bf9e55ec9","4a4d15ca-b21e-44e9-9b85-d71e518fe4ad","77e2d392-c39c-4df3-9b91-c6b674c3631c","85838f5c-46cf-43a0-b4d0-dce1638df6b9","a3c585c6-a656-42bc-98af-0c09fb4a4606"]},"4a4d15ca-b21e-44e9-9b85-d71e518fe4ad":{"key":"4a4d15ca-b21e-44e9-9b85-d71e518fe4ad","dependency":{"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"HIDE"},"0730fb63-ad5d-4079-99b4-b39bf9e55ec9":{"value":[true],"mode":"HIDE"}},"type":"INPUT","dependencyType":"AND"},"77e2d392-c39c-4df3-9b91-c6b674c3631c":{"key":"77e2d392-c39c-4df3-9b91-c6b674c3631c","dependency":{"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"HIDE"},"0730fb63-ad5d-4079-99b4-b39bf9e55ec9":{"value":[true],"mode":"HIDE"}},"type":"INPUT","dependencyType":"AND"},"a3c585c6-a656-42bc-98af-0c09fb4a4606":{"key":"a3c585c6-a656-42bc-98af-0c09fb4a4606","type":"INPUT","dependencyType":"AND","dependency":{"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"HIDE"}}},"0730fb63-ad5d-4079-99b4-b39bf9e55ec9":{"key":"0730fb63-ad5d-4079-99b4-b39bf9e55ec9","type":"INPUT","dependencyType":"AND","dependency":{"6120a2cb-96ec-4180-939c-53637e390644":{"value":["remark"],"mode":"HIDE"}}}}'
+      from_package: ''
