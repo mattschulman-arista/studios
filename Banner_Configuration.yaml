@@ -1,0 +1,154 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: ffb3d093-5e4b-487a-8ce4-d94e1450dfbb
+        workspace_id: ''
+      created_at: '2025-08-01T18:39:17.247Z'
+      created_by: mschulman
+      last_modified_at: '2025-08-06T20:25:17.776Z'
+      last_modified_by: mschulman
+      display_name: Banner Configuration
+      description: Create MOTD and Login Banners
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: |-
+          % if devicesResolver:
+              <% bannersGroup = devicesResolver.resolve()["bannersGroup"] %>
+              <% ctx.info(f"bannersGroup : {bannersGroup}")%>
+          %   if bannersGroup:
+              <% 
+                  if bannersGroup["loginBanner"] :
+                      loginBan = bannersGroup["loginBanner"]
+                      ctx.info(f"login banner: {loginBan}")
+                  if bannersGroup["motdBanner"] :
+                      motdBan = bannersGroup["motdBanner"]
+                      ctx.info(f"motd banner: {motdBan}")
+              %>
+          %       if bannersGroup["loginBanner"]:
+          banner login
+          ${loginBan}
+          EOF
+          %       endif
+          %       if bannersGroup["motdBanner"]:
+          banner motd
+          ${motdBan}
+          EOF
+          %       endif
+          %   endif
+          % endif
+      input_schema:
+        fields:
+          values:
+            d388bf82-2727-4434-ac3d-201b170f08c3:
+              id: d388bf82-2727-4434-ac3d-201b170f08c3
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: devicesResolver
+              label: Devices
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: 5d0ef098-1a2c-4098-8c57-86fd7b551636
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - d388bf82-2727-4434-ac3d-201b170f08c3
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            399a1565-c2fd-4b73-be2f-d487b064b3ca:
+              id: 399a1565-c2fd-4b73-be2f-d487b064b3ca
+              type: INPUT_FIELD_TYPE_STRING
+              name: motdBanner
+              label: MOTD Banner
+              description: The text displayed after successful login
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bf9ef355-c780-4991-b5b7-fb4fea0fb8da:
+              id: bf9ef355-c780-4991-b5b7-fb4fea0fb8da
+              type: INPUT_FIELD_TYPE_STRING
+              name: loginBanner
+              label: Login Banner
+              description: The Text to be displayed prior to logging in to the device
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5d0ef098-1a2c-4098-8c57-86fd7b551636:
+              id: 5d0ef098-1a2c-4098-8c57-86fd7b551636
+              type: INPUT_FIELD_TYPE_GROUP
+              name: bannersGroup
+              label: Banners
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - bf9ef355-c780-4991-b5b7-fb4fea0fb8da
+                    - 399a1565-c2fd-4b73-be2f-d487b064b3ca
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"bf9ef355-c780-4991-b5b7-fb4fea0fb8da":{"key":"bf9ef355-c780-4991-b5b7-fb4fea0fb8da","type":"INPUT","isMultiLine":true,"syntax":"text"},"399a1565-c2fd-4b73-be2f-d487b064b3ca":{"key":"399a1565-c2fd-4b73-be2f-d487b064b3ca","type":"INPUT","isMultiLine":true,"syntax":"text","dependencyType":"OR"},"d388bf82-2727-4434-ac3d-201b170f08c3":{"key":"d388bf82-2727-4434-ac3d-201b170f08c3","type":"INPUT","isPageLayout":true}}'
+      from_package: ''
