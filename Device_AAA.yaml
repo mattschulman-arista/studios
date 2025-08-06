@@ -1,0 +1,2024 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: 633bd0a2-d165-43fa-8d04-454530f72a98
+        workspace_id: ''
+      created_at: '2025-08-06T12:38:56.332Z'
+      created_by: mschulman
+      last_modified_at: '2025-08-06T17:49:42.307Z'
+      last_modified_by: mschulman
+      display_name: Device AAA
+      description: Configure TACACS/RADIUS Server attributes and AAA settings for Device AAA
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: |-
+          % if vrfAndSourceAssignResolver:
+              <%
+                  vrfSourceGroup = vrfAndSourceAssignResolver.resolve()["vrfAndSourceAssignGroup"]
+                  ctx.info(f"vrfSouceGroup: {vrfSourceGroup}")
+              %>
+
+              % if vrfSourceGroup:
+                  % for profile in vrfSourceGroup.vrfAndSourceProfiles:
+                      % if profile.protocol == "tacacs":
+                          % if profile.vrf:
+          ip tacacs vrf ${profile.vrf} source-interface ${profile.sourceInterface}
+                          % else:
+          ip tacacs source-interface ${profile.sourceInterface}
+                          % endif
+                      % else:
+                          % if profile.vrf:
+          ip radius vrf ${profile.vrf} source-interface ${profile.sourceInterface}
+                          % else:
+          ip radius source-interface ${profile.sourceInterface}
+                          % endif
+                      % endif
+                  % endfor
+              % endif
+          % endif
+
+          % if aaaProfileAssignResolver:
+              <% 
+                  profileGroup = aaaProfileAssignResolver.resolve()["aaaProfileAssignmentGroup"]
+                  ctx.info(f"profileGroup: {profileGroup}")
+              %>
+
+              <%
+                  aaaProfileList = [ profile for profile in aaaProfiles if profile.get("profileName") == profileGroup["aaaProfile"] ]
+                  radiusGlobalProfileList = [ profile for profile in radiusGlobalSettingsProfiles if profile.get("radiusProfileName") == profileGroup["radiusGlobalSettingsProfile"] ]
+                  tacacsGlobalProfileList = [ profile for profile in tacacsGlobalSettingsProfiles if profile.get("tacacsProfileName") == profileGroup["tacacsGlobalSettingsProfile"] ]
+
+                  if aaaProfileList:
+                      aaaProfile = aaaProfileList[0]
+                      ctx.info(f"AAA Profile: {aaaProfile}")
+                  endif
+
+                  if radiusGlobalProfileList:
+                      radiusGlobalProfile = radiusGlobalProfileList[0]
+                      ctx.info(f"RADIUS Global Profile: radiusGlobalProfile")
+                  endif
+
+                  if tacacsGlobalProfileList:
+                      tacacsGlobalProfile = tacacsGlobalProfileList[0]
+                      ctx.info(f"TACACS Global Profile: tacacsGlobalProfile")
+                  endif
+              %>
+
+              % if tacacsServers:
+                  % for tacacsServer in tacacsServers:
+                      <%
+                          tacacsServerString = f"tacacs-server host {tacacsServer.tacacsHost} port {tacacsServer.tacacsPort}"
+                          if tacacsServer.vrf:
+                              tacacsServerString = tacacsServerString + f" vrf {tacacsServer.vrf}"
+                          endif
+                          if tacacsServer.singleConnection:
+                              tacacsServerString = tacacsServerString + " single-connection"
+                          endif
+                          if tacacsServer.timeout:
+                              tacacsServerString = tacacsServerString + f" timeout {tacacsServer.timeout}"
+                          endif
+                          if tacacsServer.tacacsKey:
+                              tacacsServerString = tacacsServerString + f" key {tacacsServer.tacacsKey}"
+                          endif
+                      %>
+           ${tacacsServerString}
+                  % endfor
+              % endif
+
+              % if tacacsGlobalProfileList:
+                  % if tacacsGlobalProfile.tacacsKey:
+          tacacs-server key ${tacacsGlobalProfile.tacacsKey} 
+                  % endif
+                  % if tacacsGlobalProfile.tacacsTimeout:
+          tacacs-server timeout ${tacacsGlobalProfile.tacacsTimeout}
+                  % endif
+              % endif
+
+          % if radiusServers:
+                  % for radiusServer in radiusServers:
+                      <%
+                          
+                          if radiusServer.vrf:
+                              radiusServerString = f"radius-server host {radiusServer.radiusHost} vrf {radiusServer.vrf} auth-port {radiusServer.authenticationPort} acct-port {radiusServer.accountingPort}"
+                          else:
+                              radiusServerString = f"radius-server host {radiusServer.radiusHost} auth-port {radiusServer.authenticationPort} acct-port {radiusServer.accountingPort}"
+                          endif
+                          if radiusServer.timeout:
+                              radiusServerString = radiusServerString + f" timeout {radiusServer.timeout}"
+                          endif
+                          if radiusServer.radiusKey:
+                              radiusServerString = radiusServerString + f" key {radiusServer.radiusKey}"
+                          endif
+                      %>
+           ${radiusServerString}
+                  % endfor
+              % endif
+
+              % if radiusGlobalProfileList:
+                  % if radiusGlobalProfile.radiusKey:
+          radius-server key ${radiusGlobalProfile.radiusKey} 
+                  % endif
+                  % if radiusGlobalProfile.radiusTimeout:
+          radius-server timeout ${radiusGlobalProfile.radiusTimeout}
+                  % endif
+              % endif
+
+              % if serverGroups:
+                  % for serverGroup in serverGroups:
+          aaa group server ${serverGroup.serverGroupType} ${serverGroup.groupName}
+                      % if serverGroup.serverGroupType == "tacacs+":
+                          % for server in serverGroup.tacacsServers:
+            server ${server}
+                          % endfor
+                      % else:
+                          % for server in serverGroup.radiusServers:
+            server ${server}
+                          % endfor
+                      % endif
+                  % endfor
+              % endif
+
+              % if aaaProfileList:
+                  % if aaaProfile.authenticationConfiguration:
+                      % for authCLine in aaaProfile.authenticationConfiguration:
+                          <% 
+                              authCOrderString = ""
+                              for authCOrder in authCLine.authCOrder:
+                                  if authCOrder.localAuthC:
+                                      authCOrderString = authCOrderString + " local "
+                                  elif authCOrder.useAuthCGroup:
+                                      authCOrderString = authCOrderString + " group " + authCOrder.authCGroup + " "
+                                  elif authCOrder.authCNone:
+                                      authCOrderString = authCOrderString + " none "
+                              endfor
+                          %>
+          aaa authentication ${authCLine.authCtype} ${authCLine.authCMethod} ${authCOrderString} 
+                      % endfor
+                  % endif
+                  % if aaaProfile.authorizationConfiguration:
+                      % for authZLine in aaaProfile.authorizationConfiguration:
+                          <% 
+                              authZOrderString = ""
+                              if authZLine.authZOrder:
+                                  for authZOrder in authZLine.authZOrder:
+                                      if authZOrder.localAuthZ:
+                                          authZOrderString = authZOrderString + " local "
+                                      elif authZOrder.useAuthZGroup:
+                                          authZOrderString = authZOrderString + " group " + authZOrder.authZGroup + " "
+                                      elif authZOrder.authZNone:
+                                          authZOrderString = authZOrderString + " none "
+                                      endif
+                                  endfor
+                              endif
+                          %>
+                          % if authZLine.authZType == "serial-console" or authZLine.authZType == "config-commands":
+          aaa authorization ${authZLine.authZType}
+                          % elif authZLine.authZType == "commands":
+          aaa authorization ${authZLine.authZType} ${authZLine.authZCommandsPriv} ${authZLine.authZMethod} ${authZOrderString}
+                          % else:
+          aaa authorization ${authZLine.authZType} ${authZLine.authZMethod} ${authZOrderString} 
+                          % endif
+                      % endfor
+                  % endif
+                  % if aaaProfile.accountingConfiguration:
+                      % for acctLine in aaaProfile.accountingConfiguration:
+                          <% 
+                              acctOrderString = ""
+                              if acctLine.acctOrder:
+                                  for acctOrder in acctLine.acctOrder:
+                                      if acctOrder.acctGroup:
+                                          acctOrderString = acctOrderString + " group " + acctOrder.acctGroup + " "
+                                      elif acctOrder.useLogging:
+                                          acctOrderString = acctZOrderString + " logging "
+                                      endif
+                                  endfor
+                              endif
+                          %>
+                          % if acctLine.accountingType == "commands":
+          aaa accounting ${acctLine.accountingType} ${acctLine.accountingCommandsPriv} ${acctLine.accountingMethod} ${acctLine.accountingStartStop} ${acctOrderString}
+                          % else:
+          aaa accounting ${acctLine.accountingType} ${acctLine.accountingMethod} ${acctLine.accountingStartStop} ${acctOrderString} 
+                          % endif
+                      % endfor
+                  % endif
+                  ${aaaProfile.get("eosCli")}
+              % endif
+          % endif
+      input_schema:
+        fields:
+          values:
+            0473ac29-4afa-4df1-9675-29adc5813fd6:
+              id: 0473ac29-4afa-4df1-9675-29adc5813fd6
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: VRF and Source Profiles Group
+              description: Group of members for VRF and Source Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - e8a2d8ec-9986-4d27-ab71-81892a929d9f
+                    - b5a66270-8ec7-4849-ac8c-c18e9a730308
+                    - 5f7657c6-59ef-4ba3-8079-26ab3a086998
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d8d46bd8-ff4f-4853-a6c9-1eed66ae6278:
+              id: d8d46bd8-ff4f-4853-a6c9-1eed66ae6278
+              type: INPUT_FIELD_TYPE_STRING
+              name: accountingStartStop
+              label: Accounting Start Stop
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - start-stop
+                    - stop-only
+                    - none
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            782f4c01-5644-472e-9f7c-1224ee00e8e8:
+              id: 782f4c01-5644-472e-9f7c-1224ee00e8e8
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: localAuthZ
+              label: Local Authorization
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            82822c28-d9d1-4ad6-8bfb-7166381de34d:
+              id: 82822c28-d9d1-4ad6-8bfb-7166381de34d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: accountingConfigurationGroup
+              label: Accounting Configuration Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - c0e23b5a-8d8c-46fe-859a-9a70b5345139
+                    - bbad211f-533d-4657-87fc-2ae518779c50
+                    - d8d46bd8-ff4f-4853-a6c9-1eed66ae6278
+                    - 973ec8db-1de7-44d4-8809-e8b2ba3f8bff
+                    - fbb42e53-c079-47bd-92d6-b7d7a3bc27f1
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0cf583d9-0819-4519-a8ba-fd2c127b5b8c:
+              id: 0cf583d9-0819-4519-a8ba-fd2c127b5b8c
+              type: INPUT_FIELD_TYPE_STRING
+              name: authZMethod
+              label: Authorization Method
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - default
+                    - console
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e6871ed6-c5dd-4d60-9711-5958b19727c4:
+              id: e6871ed6-c5dd-4d60-9711-5958b19727c4
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: singleConnection
+              label: Single-Connection
+              description: Enable single-connection to use a single TCP Connection for multiple sessions.
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7ce67932-c2cc-4450-9d6d-2eb81779aa67:
+              id: 7ce67932-c2cc-4450-9d6d-2eb81779aa67
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: radiusTimeout
+              label: RADIUS Timeout
+              description: Default RADIUS Timeout (Time in seconds to wait for a TACACS Server to respond). Can be overridden for an individual RADIUS Server. Range is 1-1000.  Default is 5
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..1000
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1e430af7-6e8d-4fd0-93fc-90ca724f0c8d:
+              id: 1e430af7-6e8d-4fd0-93fc-90ca724f0c8d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: TACACS Global Settings Profiles Group
+              description: Group of members for TACACS Default Settings Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 2fe2b29c-c838-471f-b780-57810ce66708
+                    - 99e5b84b-1dd9-44b5-8690-44df6ddc885b
+                    - e7e24c3d-9168-435c-a9d6-07c5367449a4
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c7a3d499-0e88-4881-887f-68345cce7d46:
+              id: c7a3d499-0e88-4881-887f-68345cce7d46
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: useLogging
+              label: Use Logging
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c0e23b5a-8d8c-46fe-859a-9a70b5345139:
+              id: c0e23b5a-8d8c-46fe-859a-9a70b5345139
+              type: INPUT_FIELD_TYPE_STRING
+              name: accountingType
+              label: Accounting Type
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - commands
+                    - exec
+                    - system
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            12231643-4772-4bcc-be55-a16f6f24d27a:
+              id: 12231643-4772-4bcc-be55-a16f6f24d27a
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsKey
+              label: Encoded TACACS Key
+              description: If you wish to override the Global TACACS Key setting configured in the TACACS Global Settings Profile, enter the encoded Key here.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9efa173f-0037-4f2a-85bc-cce9ed49332b:
+              id: 9efa173f-0037-4f2a-85bc-cce9ed49332b
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: aaaProfileAssignResolver
+              label: AAA Profile Assignment
+              description: Assign AAA Profile and source interface to device(s)
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: e7b537de-c5a5-4f4e-9673-ffdab365b471
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e8a2d8ec-9986-4d27-ab71-81892a929d9f:
+              id: e8a2d8ec-9986-4d27-ab71-81892a929d9f
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            99e5b84b-1dd9-44b5-8690-44df6ddc885b:
+              id: 99e5b84b-1dd9-44b5-8690-44df6ddc885b
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: tacacsTimeout
+              label: TACACS Timeout
+              description: Default TACACS Timeout (Time in seconds to wait for a TACACS Server to respond). Can be overridden for an individual TACACS Server. Range is 1-1000.  Default is 5
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..1000
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ac4f6754-d601-4aee-8f8f-f98e2d63a903:
+              id: ac4f6754-d601-4aee-8f8f-f98e2d63a903
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
+              label: Profile Name
+              description: Name of the Profile
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5b12d37b-29e8-4722-bc6b-da536f98a48b:
+              id: 5b12d37b-29e8-4722-bc6b-da536f98a48b
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: accountingPort
+              label: Accounting Port
+              description: Configure the Accounting port for the selected RADIUS server by entering a value between 0 and 65535. The default port is 1813.
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: '1813'
+                static_options: null
+                range: 1..65535
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6d691ad6-866a-4fa6-82b5-1882a5a5d824:
+              id: 6d691ad6-866a-4fa6-82b5-1882a5a5d824
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: timeout
+              label: Timeout
+              description: If you wish to override the global timeout setting configured in a TACACS Global Settings Profile, enter it here.  Time in seconds to wait for the TACACS Server to respond.   Range is 1-1000.  Default is 5
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..1000
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1885c87b-ca29-47d6-93a3-e7b39b492697:
+              id: 1885c87b-ca29-47d6-93a3-e7b39b492697
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: useAuthZGroup
+              label: Use Authorization Group
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            87e8a9ba-3a8d-49f2-9d2b-0e2b1e0f7d57:
+              id: 87e8a9ba-3a8d-49f2-9d2b-0e2b1e0f7d57
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsServer
+              label: TACACS Server
+              description: Select the TACACS Server to Add to the group
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"ad551232-55c4-442e-aba4-06346bc65a91"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            cb97fe90-d621-49a9-96b9-14c62d6c1740:
+              id: cb97fe90-d621-49a9-96b9-14c62d6c1740
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: timeout
+              label: Timeout
+              description: If you wish to override the global timeout setting configured in a TACACS Global Settings Profile, enter it here.  Time in seconds to wait for the RADIUS Server to respond.   Range is 1-1000.  Default is 5
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..1000
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ad551232-55c4-442e-aba4-06346bc65a91:
+              id: ad551232-55c4-442e-aba4-06346bc65a91
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsHost
+              label: TACACS Host
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: ^(?:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))$
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3e94baf5-54b2-45db-8f44-72fe2824a73b:
+              id: 3e94baf5-54b2-45db-8f44-72fe2824a73b
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: RADIUS Global Settings Profiles Group
+              description: Group of members for RADIUS Default Settings Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - f7f91b8c-ba89-4c50-bbdb-b3f00cd3e972
+                    - 7ce67932-c2cc-4450-9d6d-2eb81779aa67
+                    - 84dc5fa7-eba0-420f-96c6-791f462d0247
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            2fe2b29c-c838-471f-b780-57810ce66708:
+              id: 2fe2b29c-c838-471f-b780-57810ce66708
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsProfileName
+              label: TACACS Profile Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            649ec648-2e9c-422f-bc49-5e398af61d49:
+              id: 649ec648-2e9c-422f-bc49-5e398af61d49
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: authCOrder
+              label: Authentication Order
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: dac634a9-efb9-476f-a8a8-6a430129f78a
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7bc939b6-938e-4b1d-8794-f74b0ece4116:
+              id: 7bc939b6-938e-4b1d-8794-f74b0ece4116
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: useAuthCGroup
+              label: Use Authentication Group
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1339aff8-5a56-4c4a-afc6-80a37c2ab2cf:
+              id: 1339aff8-5a56-4c4a-afc6-80a37c2ab2cf
+              type: INPUT_FIELD_TYPE_STRING
+              name: authZGroup
+              label: Authorization Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"4469c463-f49e-4525-b845-d99efc35f99e"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            af917cad-3a7f-45cd-9cc9-789e6c6ca816:
+              id: af917cad-3a7f-45cd-9cc9-789e6c6ca816
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: authorizationConfiguration
+              label: Authorization Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 71ccad5e-6ba3-4bc3-9efa-9694a7f0cf05
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5f7657c6-59ef-4ba3-8079-26ab3a086998:
+              id: 5f7657c6-59ef-4ba3-8079-26ab3a086998
+              type: INPUT_FIELD_TYPE_STRING
+              name: protocol
+              label: Protocol
+              description: radius or tacacs
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - radius
+                    - tacacs
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e7e24c3d-9168-435c-a9d6-07c5367449a4:
+              id: e7e24c3d-9168-435c-a9d6-07c5367449a4
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsKey
+              label: Encoded TACACS Key
+              description: The Encoded TACACS key to use for all TACACS servers.  Can be overridden for an individual TACACS Server.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            cli:
+              id: cli
+              type: INPUT_FIELD_TYPE_STRING
+              name: eosCli
+              label: EOS CLI
+              description: Optionally, provide CLI commands to be applied globally. If CLI commands conflict with Authentication Studio configuration, CLI configuration takes precedence.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 313456bd-e0a0-4415-9306-8894e1d539d9
+                    - 98255382-37df-44fe-82d9-d0b6c7d6ac57
+                    - ff977ae0-dfc9-4a52-85cc-af316f665f62
+                    - 03d1ed28-06cd-4c7f-9168-3a19c9895aa1
+                    - 015df677-26c7-4639-b59e-5585928a92a4
+                    - e7414c97-6021-426d-a3ba-fc915bf9be21
+                    - 9efa173f-0037-4f2a-85bc-cce9ed49332b
+                    - 6b2d02f5-cb34-4cc4-b415-a104dec49a91
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            555589ed-15da-47f8-9660-4887b56443e8:
+              id: 555589ed-15da-47f8-9660-4887b56443e8
+              type: INPUT_FIELD_TYPE_GROUP
+              name: vrfAndSourceAssignGroup
+              label: VRF and Source Interface Assignment Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 42a467b6-1819-49b4-b7ea-de5a2c68248b
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            8551044b-0e35-4478-a620-734a1c05d8ce:
+              id: 8551044b-0e35-4478-a620-734a1c05d8ce
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: localAuthC
+              label: Local Authentication
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6b3bba9b-db7a-49f4-aa46-504b6b8c23ee:
+              id: 6b3bba9b-db7a-49f4-aa46-504b6b8c23ee
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: authCNone
+              label: Authentication None
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            fbb42e53-c079-47bd-92d6-b7d7a3bc27f1:
+              id: fbb42e53-c079-47bd-92d6-b7d7a3bc27f1
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: acctOrder
+              label: Accounting Order
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: afe17969-470c-4b8d-bac8-dd8551fb3117
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9cf0b13d-fbc7-40ec-8ba1-9c70a22187db:
+              id: 9cf0b13d-fbc7-40ec-8ba1-9c70a22187db
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: authZNone
+              label: Authorization None
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f6ba3c85-cf7a-4d6b-b0be-6b40168c4c68:
+              id: f6ba3c85-cf7a-4d6b-b0be-6b40168c4c68
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusServer
+              label: RADIUS Server
+              description: Select the RADIUS Server to Add to the group
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"e7f4c8d7-e25a-4478-8d5e-819e4bd846ec"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d6693c47-f360-40f0-8f58-94eeba66da06:
+              id: d6693c47-f360-40f0-8f58-94eeba66da06
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: If a VRF is used to connect to the TACACS server, enter it here.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            aef198ac-3e09-4e7b-b491-15beb50dcc87:
+              id: aef198ac-3e09-4e7b-b491-15beb50dcc87
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusGlobalSettingsProfile
+              label: RADIUS Global Settings Profile
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"f7f91b8c-ba89-4c50-bbdb-b3f00cd3e972"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            2ad38bb1-ad2a-496e-97a9-ee0351a5a9db:
+              id: 2ad38bb1-ad2a-496e-97a9-ee0351a5a9db
+              type: INPUT_FIELD_TYPE_STRING
+              name: tacacsGlobalSettingsProfile
+              label: TACACS Global Settings Profile
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"2fe2b29c-c838-471f-b780-57810ce66708"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f7f91b8c-ba89-4c50-bbdb-b3f00cd3e972:
+              id: f7f91b8c-ba89-4c50-bbdb-b3f00cd3e972
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusProfileName
+              label: RADIUS Profile Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            4469c463-f49e-4525-b845-d99efc35f99e:
+              id: 4469c463-f49e-4525-b845-d99efc35f99e
+              type: INPUT_FIELD_TYPE_STRING
+              name: groupName
+              label: Group Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f5e2d9b3-ecf8-4b50-acb1-aed99fd0dff1:
+              id: f5e2d9b3-ecf8-4b50-acb1-aed99fd0dff1
+              type: INPUT_FIELD_TYPE_STRING
+              name: serverGroupType
+              label: Server Group Type
+              description: The type of server group - tacacs or radius
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - radius
+                    - tacacs+
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            98255382-37df-44fe-82d9-d0b6c7d6ac57:
+              id: 98255382-37df-44fe-82d9-d0b6c7d6ac57
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: radiusServers
+              label: RADIUS Servers
+              description: Configure RADIUS Servers.  These can be added to a RADIUS Server Group, which can then be added to a AAA Profile and assigned to device(s)
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 798a09b3-9eef-43d4-9633-4d5938befc1d
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            42a467b6-1819-49b4-b7ea-de5a2c68248b:
+              id: 42a467b6-1819-49b4-b7ea-de5a2c68248b
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfAndSourceProfiles
+              label: VRF and Source Profiles
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 0473ac29-4afa-4df1-9675-29adc5813fd6
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            dac634a9-efb9-476f-a8a8-6a430129f78a:
+              id: dac634a9-efb9-476f-a8a8-6a430129f78a
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Authentication Order Group
+              description: Group of members for Auth Order
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 8551044b-0e35-4478-a620-734a1c05d8ce
+                    - 7bc939b6-938e-4b1d-8794-f74b0ece4116
+                    - 68fba01f-be80-43a6-bbb0-63cbe0d44a25
+                    - 6b3bba9b-db7a-49f4-aa46-504b6b8c23ee
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b00eee45-8752-42ec-99e7-0d4fbb2c84b2:
+              id: b00eee45-8752-42ec-99e7-0d4fbb2c84b2
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: authenticationConfiguration
+              label: Authentication Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: b1e3b439-f004-4ef4-9827-9047f1429467
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ea6a0393-1118-480a-89e3-38bfb10e26c4:
+              id: ea6a0393-1118-480a-89e3-38bfb10e26c4
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: AAA Profiles Group
+              description: Group of members for AAA Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - ac4f6754-d601-4aee-8f8f-f98e2d63a903
+                    - b00eee45-8752-42ec-99e7-0d4fbb2c84b2
+                    - af917cad-3a7f-45cd-9cc9-789e6c6ca816
+                    - 7b6c3421-6541-49cf-bcf5-ebee9ef7d120
+                    - cli
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            973ec8db-1de7-44d4-8809-e8b2ba3f8bff:
+              id: 973ec8db-1de7-44d4-8809-e8b2ba3f8bff
+              type: INPUT_FIELD_TYPE_STRING
+              name: accountingCommandsPriv
+              label: Accounting Commands Privilege Levels
+              description: If Method is Commands, Privilege Level, range of levels or all
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bbad211f-533d-4657-87fc-2ae518779c50:
+              id: bbad211f-533d-4657-87fc-2ae518779c50
+              type: INPUT_FIELD_TYPE_STRING
+              name: accountingMethod
+              label: Accounting Method
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - console
+                    - default
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            566dfebc-8d84-4647-8425-96cb2d5338c1:
+              id: 566dfebc-8d84-4647-8425-96cb2d5338c1
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: If a VRF is used to connect to the RADIUS server, enter it here.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            915f4e61-f6a3-47bc-8ad4-89fc64b1a93c:
+              id: 915f4e61-f6a3-47bc-8ad4-89fc64b1a93c
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusKey
+              label: Encoded RADIUS Key
+              description: If you wish to override the Global RADIUS Key setting configured in the RADIUS Global Settings Profile, enter the encoded Key here.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            421a5834-800a-4210-a943-19683951f3fe:
+              id: 421a5834-800a-4210-a943-19683951f3fe
+              type: INPUT_FIELD_TYPE_STRING
+              name: acctGroup
+              label: Accounting Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"4469c463-f49e-4525-b845-d99efc35f99e"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a3066721-d04b-481c-9c15-760643370283:
+              id: a3066721-d04b-481c-9c15-760643370283
+              type: INPUT_FIELD_TYPE_STRING
+              name: authCtype
+              label: Authentication Type
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - login
+                    - enable
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            92b5233c-f8b4-44b1-b6ba-7b7750c20f0b:
+              id: 92b5233c-f8b4-44b1-b6ba-7b7750c20f0b
+              type: INPUT_FIELD_TYPE_STRING
+              name: authZType
+              label: Authorization Type
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - commands
+                    - exec
+                    - serial-console
+                    - config-commands
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ce651019-715d-4509-99cb-6519c2c8c2b9:
+              id: ce651019-715d-4509-99cb-6519c2c8c2b9
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: TACACS Servers Group
+              description: Group of members for TACACS Servers
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - ad551232-55c4-442e-aba4-06346bc65a91
+                    - 12231643-4772-4bcc-be55-a16f6f24d27a
+                    - 69a57c6c-e612-43c2-8f6d-cddd94971b71
+                    - d6693c47-f360-40f0-8f58-94eeba66da06
+                    - 6d691ad6-866a-4fa6-82b5-1882a5a5d824
+                    - e6871ed6-c5dd-4d60-9711-5958b19727c4
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e7b537de-c5a5-4f4e-9673-ffdab365b471:
+              id: e7b537de-c5a5-4f4e-9673-ffdab365b471
+              type: INPUT_FIELD_TYPE_GROUP
+              name: aaaProfileAssignmentGroup
+              label: AAA Profile Assignment Group
+              description: Group of members for AAA Profile Assignment
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - e11f5e28-4d23-451d-97b8-fc8cdda05af1
+                    - aef198ac-3e09-4e7b-b491-15beb50dcc87
+                    - 2ad38bb1-ad2a-496e-97a9-ee0351a5a9db
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e11f5e28-4d23-451d-97b8-fc8cdda05af1:
+              id: e11f5e28-4d23-451d-97b8-fc8cdda05af1
+              type: INPUT_FIELD_TYPE_STRING
+              name: aaaProfile
+              label: AAA Profile
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"ac4f6754-d601-4aee-8f8f-f98e2d63a903"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            afe17969-470c-4b8d-bac8-dd8551fb3117:
+              id: afe17969-470c-4b8d-bac8-dd8551fb3117
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Accounting Order Group
+              description: Group of members for Accounting Order
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 421a5834-800a-4210-a943-19683951f3fe
+                    - c7a3d499-0e88-4881-887f-68345cce7d46
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1c2e7a9e-6a16-4126-b23b-8edc3b7c053c:
+              id: 1c2e7a9e-6a16-4126-b23b-8edc3b7c053c
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: authZOrder
+              label: Authorization Order
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 73a659ee-a2a3-4dbc-95ec-dc8b3b1302d5
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            71ccad5e-6ba3-4bc3-9efa-9694a7f0cf05:
+              id: 71ccad5e-6ba3-4bc3-9efa-9694a7f0cf05
+              type: INPUT_FIELD_TYPE_GROUP
+              name: authorizationConfigGroup
+              label: Authorization Configuration Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 92b5233c-f8b4-44b1-b6ba-7b7750c20f0b
+                    - 0cf583d9-0819-4519-a8ba-fd2c127b5b8c
+                    - 9771f681-e62d-4e1d-9aaa-22bb1880c328
+                    - 1c2e7a9e-6a16-4126-b23b-8edc3b7c053c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            313456bd-e0a0-4415-9306-8894e1d539d9:
+              id: 313456bd-e0a0-4415-9306-8894e1d539d9
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: tacacsServers
+              label: TACACS Servers
+              description: Configure TACACS Servers.  These can be added to a TACACS Server Group, which can then be added to a AAA Profile and assigned to device(s)
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: ce651019-715d-4509-99cb-6519c2c8c2b9
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            84dc5fa7-eba0-420f-96c6-791f462d0247:
+              id: 84dc5fa7-eba0-420f-96c6-791f462d0247
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusKey
+              label: Encoded RADIUS Key
+              description: The Encoded RADIUS key to use for all RADIUS servers.  Can be overridden for an individual RADIUS Server.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            015df677-26c7-4639-b59e-5585928a92a4:
+              id: 015df677-26c7-4639-b59e-5585928a92a4
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: tacacsGlobalSettingsProfiles
+              label: TACACS Global Settings Profiles
+              description: Configure settings for all TACACS Servers- Key, timeout, and key.  These can be overridden for an individual TACACS Server.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 1e430af7-6e8d-4fd0-93fc-90ca724f0c8d
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            85181006-12cb-4427-8be5-c39d432a9eeb:
+              id: 85181006-12cb-4427-8be5-c39d432a9eeb
+              type: INPUT_FIELD_TYPE_STRING
+              name: authCMethod
+              label: Authentication Method
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - console
+                    - default
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b1e3b439-f004-4ef4-9827-9047f1429467:
+              id: b1e3b439-f004-4ef4-9827-9047f1429467
+              type: INPUT_FIELD_TYPE_GROUP
+              name: authentictionConfigGroup
+              label: Authentication Configuration Group
+              description: Group of members for Authentication Configuration
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - a3066721-d04b-481c-9c15-760643370283
+                    - 85181006-12cb-4427-8be5-c39d432a9eeb
+                    - 649ec648-2e9c-422f-bc49-5e398af61d49
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            db3652ff-4b7c-43a8-bb4f-26620783de45:
+              id: db3652ff-4b7c-43a8-bb4f-26620783de45
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: authenticationPort
+              label: Authentication Port
+              description: Configure the Accounting port for the selected RADIUS server by entering a value between 0 and 65535. The default port is 1812.
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: '1812'
+                static_options: null
+                range: 1..65535
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            68fba01f-be80-43a6-bbb0-63cbe0d44a25:
+              id: 68fba01f-be80-43a6-bbb0-63cbe0d44a25
+              type: INPUT_FIELD_TYPE_STRING
+              name: authCGroup
+              label: Authentication Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"4469c463-f49e-4525-b845-d99efc35f99e"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            73a659ee-a2a3-4dbc-95ec-dc8b3b1302d5:
+              id: 73a659ee-a2a3-4dbc-95ec-dc8b3b1302d5
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Authorization Order Group
+              description: Group of members for Authorization Order
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 782f4c01-5644-472e-9f7c-1224ee00e8e8
+                    - 1885c87b-ca29-47d6-93a3-e7b39b492697
+                    - 1339aff8-5a56-4c4a-afc6-80a37c2ab2cf
+                    - 9cf0b13d-fbc7-40ec-8ba1-9c70a22187db
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            798a09b3-9eef-43d4-9633-4d5938befc1d:
+              id: 798a09b3-9eef-43d4-9633-4d5938befc1d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: RADIUS Servers Group
+              description: Group of members for RADIUS Servers
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - e7f4c8d7-e25a-4478-8d5e-819e4bd846ec
+                    - 915f4e61-f6a3-47bc-8ad4-89fc64b1a93c
+                    - db3652ff-4b7c-43a8-bb4f-26620783de45
+                    - 5b12d37b-29e8-4722-bc6b-da536f98a48b
+                    - cb97fe90-d621-49a9-96b9-14c62d6c1740
+                    - 566dfebc-8d84-4647-8425-96cb2d5338c1
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6b2d02f5-cb34-4cc4-b415-a104dec49a91:
+              id: 6b2d02f5-cb34-4cc4-b415-a104dec49a91
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: vrfAndSourceAssignResolver
+              label: VRF and Source Interface Assignment
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: 555589ed-15da-47f8-9660-4887b56443e8
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e7414c97-6021-426d-a3ba-fc915bf9be21:
+              id: e7414c97-6021-426d-a3ba-fc915bf9be21
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: radiusGlobalSettingsProfiles
+              label: RADIUS Global Settings Profiles
+              description: Configure settings for all RADIUS Servers- Key, timeout, and key.  These can be overridden for an individual RADIUS Server.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 3e94baf5-54b2-45db-8f44-72fe2824a73b
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7b6c3421-6541-49cf-bcf5-ebee9ef7d120:
+              id: 7b6c3421-6541-49cf-bcf5-ebee9ef7d120
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: accountingConfiguration
+              label: Accounting Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 82822c28-d9d1-4ad6-8bfb-7166381de34d
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            03d1ed28-06cd-4c7f-9168-3a19c9895aa1:
+              id: 03d1ed28-06cd-4c7f-9168-3a19c9895aa1
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: aaaProfiles
+              label: AAA Profiles
+              description: Create AAA Profiles to configure the AAA sources and order.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: ea6a0393-1118-480a-89e3-38bfb10e26c4
+                key: ac4f6754-d601-4aee-8f8f-f98e2d63a903
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            dfb237a3-f4a1-467b-8dd9-f76e966a4eed:
+              id: dfb237a3-f4a1-467b-8dd9-f76e966a4eed
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: radiusServers
+              label: RADIUS Servers
+              description: Add RADIUS Servers to this group
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: f6ba3c85-cf7a-4d6b-b0be-6b40168c4c68
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e7f4c8d7-e25a-4478-8d5e-819e4bd846ec:
+              id: e7f4c8d7-e25a-4478-8d5e-819e4bd846ec
+              type: INPUT_FIELD_TYPE_STRING
+              name: radiusHost
+              label: RADIUS Host
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: ^(?:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))$
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            69a57c6c-e612-43c2-8f6d-cddd94971b71:
+              id: 69a57c6c-e612-43c2-8f6d-cddd94971b71
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: tacacsPort
+              label: TACACS Port
+              description: Configure the port for the selected TACACS server by entering a value between 0 and 65535. The default port is 49..
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: '49'
+                static_options: null
+                range: 1..65535
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b5a66270-8ec7-4849-ac8c-c18e9a730308:
+              id: b5a66270-8ec7-4849-ac8c-c18e9a730308
+              type: INPUT_FIELD_TYPE_STRING
+              name: sourceInterface
+              label: Source Interface
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9771f681-e62d-4e1d-9aaa-22bb1880c328:
+              id: 9771f681-e62d-4e1d-9aaa-22bb1880c328
+              type: INPUT_FIELD_TYPE_STRING
+              name: authZCommandsPriv
+              label: Authorization Commands Privilege Levels
+              description: If Method is Command, Privilege Level, range of levels or all
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5fca4c49-5370-44ab-ac11-6c1d3b937a6d:
+              id: 5fca4c49-5370-44ab-ac11-6c1d3b937a6d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Server Groups Group
+              description: Group of members for Server Groups
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 4469c463-f49e-4525-b845-d99efc35f99e
+                    - f5e2d9b3-ecf8-4b50-acb1-aed99fd0dff1
+                    - 24b0ffa1-c70a-4694-869d-613ca02fda2a
+                    - dfb237a3-f4a1-467b-8dd9-f76e966a4eed
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            24b0ffa1-c70a-4694-869d-613ca02fda2a:
+              id: 24b0ffa1-c70a-4694-869d-613ca02fda2a
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: tacacsServers
+              label: TACACS Servers
+              description: Add TACACS Servers to this group
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 87e8a9ba-3a8d-49f2-9d2b-0e2b1e0f7d57
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ff977ae0-dfc9-4a52-85cc-af316f665f62:
+              id: ff977ae0-dfc9-4a52-85cc-af316f665f62
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: serverGroups
+              label: Server Groups
+              description: Configure Server Groups and add TACACS or RADIUS Servers to them.  These groups can be added to AAA Profiles and then assigned to device(s).
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 5fca4c49-5370-44ab-ac11-6c1d3b937a6d
+                key: 4469c463-f49e-4525-b845-d99efc35f99e
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"b9709d8e-b772-4ac1-86b1-47f9c58488c7":{"key":"b9709d8e-b772-4ac1-86b1-47f9c58488c7","type":"INPUT","valueToLabelMap":{"True":"Enable","False":"Disable"}},"ba0af1d0-4dd6-4fec-9c4f-1dea7d424a58":{"key":"ba0af1d0-4dd6-4fec-9c4f-1dea7d424a58","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"28b8633c-62b3-4177-97b7-0d01f014d646":{"key":"28b8633c-62b3-4177-97b7-0d01f014d646","dependency":{},"type":"INPUT","valueToLabelMap":{"True":"Allow","False":"Discard"}},"9191e948-e549-4605-ab1c-6bba880e9d5f":{"key":"9191e948-e549-4605-ab1c-6bba880e9d5f","type":"INPUT","valueToLabelMap":{"True":"Enable","False":"Disable"}},"819a1c33-bd61-4646-832e-40ca6f2978f6":{"key":"819a1c33-bd61-4646-832e-40ca6f2978f6","type":"INPUT","order":[]},"047557f7-e379-4f20-bd9a-f7e24191b1b4":{"key":"047557f7-e379-4f20-bd9a-f7e24191b1b4","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"2201d148-fdfa-42fb-a2b0-894c04c38f69":{"key":"2201d148-fdfa-42fb-a2b0-894c04c38f69","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"feb91db2-4f4b-4c1f-9800-5757ff5f0c3b":{"key":"feb91db2-4f4b-4c1f-9800-5757ff5f0c3b","type":"INPUT","order":["54103796-c2ff-418c-858d-1858de23cf25","471d6345-4be0-4ea5-8834-4f5ab6d502fa","1678d91c-8325-4307-8db8-b152610933ff","620c1ffc-aec1-4e7d-a77a-fa5ba0c0acc5"]},"54103796-c2ff-418c-858d-1858de23cf25":{"key":"54103796-c2ff-418c-858d-1858de23cf25","type":"INPUT","order":["2201d148-fdfa-42fb-a2b0-894c04c38f69","294123f0-247d-4250-89d8-e57c3968437a"]},"61e0a2a2-ddb2-4a26-917e-1e982fcded85":{"key":"61e0a2a2-ddb2-4a26-917e-1e982fcded85","type":"INPUT","dependency":{"cabbd87b-3129-4eeb-a59b-067d01d02271":{"value":[true],"mode":"SHOW"}}},"efaeddf7-41bb-4f61-8dfc-522a438449b1":{"key":"efaeddf7-41bb-4f61-8dfc-522a438449b1","type":"INPUT","dependency":{"4401c9b0-9400-4af5-9229-36cc420e67f8":{"value":[true],"mode":"SHOW"}}},"b0ce197d-08b5-4bc4-8527-6e17a3c0f1ef":{"key":"b0ce197d-08b5-4bc4-8527-6e17a3c0f1ef","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"4cfec99d-391c-49c9-a78c-e8911fc47e36":{"key":"4cfec99d-391c-49c9-a78c-e8911fc47e36","type":"INPUT","dependency":{"b0ce197d-08b5-4bc4-8527-6e17a3c0f1ef":{"value":[true],"mode":"SHOW"}}},"757d6b5f-ffb3-4f4b-8446-552ce55b0662":{"key":"757d6b5f-ffb3-4f4b-8446-552ce55b0662","type":"INPUT","dependency":{"9f87f606-402b-4892-ab59-9d85a94ffaa5":{"value":[true],"mode":"SHOW"}}},"9f87f606-402b-4892-ab59-9d85a94ffaa5":{"key":"9f87f606-402b-4892-ab59-9d85a94ffaa5","type":"INPUT","dependency":{"b0ce197d-08b5-4bc4-8527-6e17a3c0f1ef":{"value":[true],"mode":"SHOW"}}},"encryptionKey":{"key":"encryptionKey","dependency":{"tls":{"value":[false],"mode":"SHOW"}},"type":"INPUT"},"6345d098-7603-4048-9c3d-8ab54d61eb88":{"key":"6345d098-7603-4048-9c3d-8ab54d61eb88","dependency":{},"type":"INPUT"},"radiusServer":{"key":"radiusServer","type":"INPUT","order":["host","encryptionKey","f63ae947-c5e4-4bff-8786-f9360eda4237","5219f0ff-ff9b-4e97-9607-77aa4a9d4c7f"]},"tls":{"key":"tls","valueToLabelMap":{"True":"Enabled","False":"Disabled"},"dependency":{},"type":"INPUT"},"port":{"key":"port","dependency":{"tls":{"value":[true],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"e464f7eb-cb63-4bae-88a1-549691077d05":{"key":"e464f7eb-cb63-4bae-88a1-549691077d05","dependency":{},"dependencyType":"AND","type":"INPUT"},"fb8a47c6-62f2-437f-ab64-eca7dcd6344e":{"key":"fb8a47c6-62f2-437f-ab64-eca7dcd6344e","dependency":{},"dependencyType":"AND","type":"INPUT"},"sslProfile":{"key":"sslProfile","dependency":{"tls":{"value":[true],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"1695611b-d95f-4cf8-8a06-5a4802c8c65e":{"key":"1695611b-d95f-4cf8-8a06-5a4802c8c65e","type":"INPUT","valueToLabelMap":{"True":"Retransmit","False":"Timeout"},"dependency":{"host":{"value":["__ANY__"],"mode":"SHOW"}}},"tlsConfig":{"key":"tlsConfig","type":"INPUT","order":["tls","port","sslProfile"]},"2eb5efa5-4470-4f47-b6be-0b712ac7e697":{"key":"2eb5efa5-4470-4f47-b6be-0b712ac7e697","dependency":{"tls":{"value":[true],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"8dcb9161-f99f-472b-bb79-4ab11e11f173":{"key":"8dcb9161-f99f-472b-bb79-4ab11e11f173","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"0db88e86-02fc-4816-9509-408c3203d57c":{"key":"0db88e86-02fc-4816-9509-408c3203d57c","type":"INPUT","dependency":{"8dcb9161-f99f-472b-bb79-4ab11e11f173":{"value":[true],"mode":"SHOW"}}},"47dc9238-94ef-448d-b9b7-5e9446092c90":{"key":"47dc9238-94ef-448d-b9b7-5e9446092c90","type":"INPUT","order":["2931c1aa-b1fc-440e-a215-1296a818d51a"]},"2931c1aa-b1fc-440e-a215-1296a818d51a":{"key":"2931c1aa-b1fc-440e-a215-1296a818d51a","type":"INPUT","order":["bfc318b8-57e1-4259-a651-bd6602f92f5e"]},"3b9c5a20-fa63-4552-a244-94aca76c5682":{"key":"3b9c5a20-fa63-4552-a244-94aca76c5682","type":"INPUT","order":["07321ef5-e91a-4ff8-b576-1fa7cd2a540f","e9a5ad65-1c23-4d14-9bef-a1fd11192edb","a834a648-aee1-45c1-863c-3b6350d8b4e4","be788744-cd33-49fe-ba67-dc23816abe45","8dcb9161-f99f-472b-bb79-4ab11e11f173","0db88e86-02fc-4816-9509-408c3203d57c"]},"ff3a170a-abf7-4ede-9b09-b96b3c252722":{"key":"ff3a170a-abf7-4ede-9b09-b96b3c252722","type":"INPUT","valueToLabelMap":{"True":"RADIUS","False":"Server Group"}},"29ab67fb-24b6-4a31-9727-bd2149280dd7":{"key":"29ab67fb-24b6-4a31-9727-bd2149280dd7","type":"INPUT","valueToLabelMap":{"RADIUS":"Use list of all defined RADIUS hosts"}},"fbdbd952-c1e0-4403-985d-d61f5f083e0e":{"key":"fbdbd952-c1e0-4403-985d-d61f5f083e0e","type":"INPUT","dependency":{"29ab67fb-24b6-4a31-9727-bd2149280dd7":{"value":["Server-group"],"mode":"SHOW"}}},"5e76ce0f-bee5-4887-b99f-533c1e75093f":{"key":"5e76ce0f-bee5-4887-b99f-533c1e75093f","type":"INPUT","valueToLabelMap":{"RADIUS":"Use list of all defined RADIUS hosts"}},"f530256a-cf74-48da-817a-f5248afa9286":{"key":"f530256a-cf74-48da-817a-f5248afa9286","type":"INPUT","dependency":{"5e76ce0f-bee5-4887-b99f-533c1e75093f":{"value":["Server-group"],"mode":"SHOW"}}},"23376881-e723-4ace-8d01-139bff935d83":{"key":"23376881-e723-4ace-8d01-139bff935d83","type":"INPUT","valueToLabelMap":{"True":"Record start and stop","False":"Record stop only"}},"d03ba175-684e-4e1c-a982-b8ce6f34ef6e":{"key":"d03ba175-684e-4e1c-a982-b8ce6f34ef6e","type":"INPUT","order":["5e76ce0f-bee5-4887-b99f-533c1e75093f","f530256a-cf74-48da-817a-f5248afa9286"]},"a25b62d8-6a2e-473e-9662-926f6effad17":{"key":"a25b62d8-6a2e-473e-9662-926f6effad17","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"radiusServerConfiguration":{"key":"radiusServerConfiguration","type":"INPUT","isPageLayout":true},"adba0881-31b2-49f5-ba76-e52f247f2d15":{"key":"adba0881-31b2-49f5-ba76-e52f247f2d15","type":"INPUT","valueToLabelMap":{"True":"Use Management Interface","False":"Not Configured"}},"8a20404e-a802-437d-8f43-1d737744b5aa":{"key":"8a20404e-a802-437d-8f43-1d737744b5aa","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"84c881dc-20af-431b-b641-dfb7b33d639b":{"key":"84c881dc-20af-431b-b641-dfb7b33d639b","type":"INPUT","order":["827cd500-fc6e-4333-a678-dbe959d02373","8a20404e-a802-437d-8f43-1d737744b5aa","ecebd2c9-10f4-4629-bd4c-1e8b9993b9a1"]},"9c4f9428-d2d3-4e6a-9bb2-7ca8263db4e4":{"key":"9c4f9428-d2d3-4e6a-9bb2-7ca8263db4e4","isPageLayout":true,"type":"INPUT","order":["f39af175-bcda-4c47-a7e1-c450cb63144f","10c6ce54-d507-4a87-a43d-aa78615fd213","47dc9238-94ef-448d-b9b7-5e9446092c90"]},"de9b27fa-b23d-4be6-80b8-c742a3ab35f7":{"key":"de9b27fa-b23d-4be6-80b8-c742a3ab35f7","type":"INPUT","isPageLayout":true},"monitoring":{"key":"monitoring","type":"INPUT","valueToLabelMap":{"True":"Enabled","False":"Disabled"}},"interval":{"key":"interval","type":"INPUT","dependency":{"monitoring":{"value":[true],"mode":"SHOW"}}},"method":{"key":"method","type":"INPUT","dependency":{"monitoring":{"value":[true],"mode":"SHOW"}}},"username":{"key":"username","type":"INPUT","dependency":{"monitoring":{"value":[true],"mode":"SHOW"},"method":{"value":["Access-Request"],"mode":"SHOW"}},"dependencyType":"AND"},"password":{"key":"password","type":"INPUT","dependency":{"monitoring":{"value":[true],"mode":"SHOW"},"method":{"value":["Access-Request"],"mode":"SHOW"}},"dependencyType":"AND"},"threshold":{"key":"threshold","type":"INPUT","dependency":{"monitoring":{"value":[true],"mode":"SHOW"}}},"cli":{"key":"cli","type":"INPUT","isMultiLine":true,"syntax":"aristaConfig"},"radiusProfile":{"key":"radiusProfile","type":"INPUT","order":["radiusProfileName","vrf","sourceInterfaceConfiguration","dot1XConfiguration","advancedSettings","cli"]},"record":{"key":"record","dependency":{"useFor8021XAccounting":{"value":["__ANY__"],"mode":"SHOW"}},"type":"INPUT"},"advancedSettings":{"key":"advancedSettings","type":"INPUT","order":["qosDscp","monitoringServersConfiguration","serverFallbackConfiguration"]},"useFor8021XAuth":{"key":"useFor8021XAuth","dependency":{},"type":"INPUT","valueToLabelMap":{"radius":"Use all Radius Servers"}},"f72773a6-ce91-4e93-b731-14438e162ad2":{"key":"f72773a6-ce91-4e93-b731-14438e162ad2","type":"INPUT","order":[]},"useFor8021XAccounting":{"key":"useFor8021XAccounting","dependency":{},"type":"INPUT","valueToLabelMap":{"radius":"Use all Radius Servers"}},"bfc318b8-57e1-4259-a651-bd6602f92f5e":{"key":"bfc318b8-57e1-4259-a651-bd6602f92f5e","type":"INPUT","dependency":{"10c6ce54-d507-4a87-a43d-aa78615fd213":{"value":["RADIUS"],"mode":"SHOW"}}},"radiusServer-1":{"key":"radiusServer-1","dependency":{"serverGroupType":{"value":["TACACS"],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"serverFallbackConfiguration":{"key":"serverFallbackConfiguration","type":"INPUT","order":["deadtime","retransmit","timeout"]},"015f2929-fdc5-4bd6-9049-5e76a342a05d":{"key":"015f2929-fdc5-4bd6-9049-5e76a342a05d","type":"INPUT","isPageLayout":true},"db576660-6ad9-419c-b350-9fe7a9343750":{"key":"db576660-6ad9-419c-b350-9fe7a9343750","type":"INPUT","showDefaultRow":false},"92e7e083-4383-4404-b6dc-7697ce68e12e":{"key":"92e7e083-4383-4404-b6dc-7697ce68e12e","type":"INPUT","isPageLayout":true,"order":["ba26b6f7-633c-48af-9f31-86cf57a20332"]},"ea44db0b-26d1-4503-9684-972fcc9a9d97":{"key":"ea44db0b-26d1-4503-9684-972fcc9a9d97","type":"INPUT","isPageLayout":true},"14c375be-e53c-457e-8c2b-16b1f49b494d":{"key":"14c375be-e53c-457e-8c2b-16b1f49b494d","type":"INPUT","dependencyType":"AND","dependency":{"sourceInterface":{"value":["Custom"],"mode":"SHOW"}}},"serverGroup":{"key":"serverGroup","type":"INPUT","order":["name","serverGroupType","03214d67-0e72-43b7-b16e-d2f36731b4ee"]},"authenticationProfiles":{"key":"authenticationProfiles","type":"INPUT","isPageLayout":true},"serverGroups":{"key":"serverGroups","type":"INPUT","isPageLayout":true},"authPort":{"key":"authPort","type":"INPUT","dependency":{"tls":{"value":[false],"mode":"SHOW"}}},"accountingPort":{"key":"accountingPort","type":"INPUT","dependency":{"tls":{"value":[false],"mode":"SHOW"}}},"profileAssignments":{"key":"profileAssignments","type":"INPUT","showDefaultRow":false},"sourceVRFInterfaces":{"key":"sourceVRFInterfaces","fieldOverrides":{"label":"Devices"},"type":"INPUT","showDefaultRow":false},"e4dca00c-8954-41e0-ad03-efc8af51646d":{"key":"e4dca00c-8954-41e0-ad03-efc8af51646d","type":"INPUT"},"fa87bcd1-ebe8-4bdf-8e3a-ebd4082cb9ab":{"key":"fa87bcd1-ebe8-4bdf-8e3a-ebd4082cb9ab","type":"INPUT","order":["a38cc25b-29e8-4226-8535-91a6bd83717f","86d8459c-cbab-426d-8d96-e39f3aa68a4b","53a6e60b-e21c-47c0-8fc5-a19b51741199","76b00b82-3bbf-47ed-a2a5-14803ed04e51"]},"1adddf74-35e6-4790-8754-bb9157b3eccf":{"key":"1adddf74-35e6-4790-8754-bb9157b3eccf","type":"INPUT","dependencyType":"AND","dependency":{"serverGroupType":{"value":["TACACS"],"mode":"SHOW"}}},"tacacsProfile":{"key":"tacacsProfile","order":["a6623856-a4f1-4143-b5ce-1120bbb7df6e"],"dependency":{},"type":"INPUT"},"b1e3b439-f004-4ef4-9827-9047f1429467":{"key":"b1e3b439-f004-4ef4-9827-9047f1429467","type":"INPUT","order":["a3066721-d04b-481c-9c15-760643370283","85181006-12cb-4427-8be5-c39d432a9eeb","649ec648-2e9c-422f-bc49-5e398af61d49"]},"92782179-e046-4cb8-99f8-42a13979e3a4":{"key":"92782179-e046-4cb8-99f8-42a13979e3a4","type":"INPUT","order":["a90f848a-0462-4b30-aa51-ac96d59fd91d","2ce5edd3-19c7-4f5d-a965-898e04ee990d","bfc4d6e2-903b-47e6-806b-46b1c31eb825","030b72dc-30a8-4dee-af24-fd2c88bc763d"]},"2ce5edd3-19c7-4f5d-a965-898e04ee990d":{"key":"2ce5edd3-19c7-4f5d-a965-898e04ee990d","type":"INPUT"},"bfc4d6e2-903b-47e6-806b-46b1c31eb825":{"key":"bfc4d6e2-903b-47e6-806b-46b1c31eb825","dependency":{"2ce5edd3-19c7-4f5d-a965-898e04ee990d":{"value":[false],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"030b72dc-30a8-4dee-af24-fd2c88bc763d":{"key":"030b72dc-30a8-4dee-af24-fd2c88bc763d","type":"INPUT"},"a90f848a-0462-4b30-aa51-ac96d59fd91d":{"key":"a90f848a-0462-4b30-aa51-ac96d59fd91d","type":"INPUT"},"71ccad5e-6ba3-4bc3-9efa-9694a7f0cf05":{"key":"71ccad5e-6ba3-4bc3-9efa-9694a7f0cf05","type":"INPUT","order":["92b5233c-f8b4-44b1-b6ba-7b7750c20f0b","9771f681-e62d-4e1d-9aaa-22bb1880c328","0cf583d9-0819-4519-a8ba-fd2c127b5b8c","1c2e7a9e-6a16-4126-b23b-8edc3b7c053c"]},"9771f681-e62d-4e1d-9aaa-22bb1880c328":{"key":"9771f681-e62d-4e1d-9aaa-22bb1880c328","dependency":{"92b5233c-f8b4-44b1-b6ba-7b7750c20f0b":{"value":["exec","serial-console","config-commands"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"82822c28-d9d1-4ad6-8bfb-7166381de34d":{"key":"82822c28-d9d1-4ad6-8bfb-7166381de34d","type":"INPUT","order":["c0e23b5a-8d8c-46fe-859a-9a70b5345139","973ec8db-1de7-44d4-8809-e8b2ba3f8bff","bbad211f-533d-4657-87fc-2ae518779c50","d8d46bd8-ff4f-4853-a6c9-1eed66ae6278","fbb42e53-c079-47bd-92d6-b7d7a3bc27f1"]},"973ec8db-1de7-44d4-8809-e8b2ba3f8bff":{"key":"973ec8db-1de7-44d4-8809-e8b2ba3f8bff","type":"INPUT","dependency":{"c0e23b5a-8d8c-46fe-859a-9a70b5345139":{"value":["exec","system"],"mode":"HIDE"}}},"bf3e2b7d-b95b-4d5d-930a-7927574da569":{"key":"bf3e2b7d-b95b-4d5d-930a-7927574da569","type":"INPUT","dependency":{"5e214f38-1e52-4d12-9205-4b5eb354b594":{"value":[false],"mode":"HIDE"}}},"1906ecc1-f402-44b4-9ee0-5bf874ae6ab2":{"key":"1906ecc1-f402-44b4-9ee0-5bf874ae6ab2","isPageLayout":false,"type":"INPUT"},"df47ce30-487c-45c8-8343-d9d8ad1add42":{"key":"df47ce30-487c-45c8-8343-d9d8ad1add42","type":"INPUT","dependency":{"92b5233c-f8b4-44b1-b6ba-7b7750c20f0b":{"value":["config-commands","serial-console"],"mode":"HIDE"}}},"0cf583d9-0819-4519-a8ba-fd2c127b5b8c":{"key":"0cf583d9-0819-4519-a8ba-fd2c127b5b8c","type":"INPUT","dependency":{"92b5233c-f8b4-44b1-b6ba-7b7750c20f0b":{"value":["serial-console","config-commands"],"mode":"HIDE"}}},"5dc1662d-4229-48fb-979d-a545b8aa0c17":{"key":"5dc1662d-4229-48fb-979d-a545b8aa0c17","type":"INPUT","order":[]},"fced55f0-562e-42c7-a32f-ea11a59987d2":{"key":"fced55f0-562e-42c7-a32f-ea11a59987d2","type":"INPUT","dependency":{"a3066721-d04b-481c-9c15-760643370283":{"value":["login"],"mode":"HIDE"}}},"5e309c22-6941-4f4c-be55-af949fe09d4c":{"key":"5e309c22-6941-4f4c-be55-af949fe09d4c","type":"INPUT","isPageLayout":true},"7502c088-e793-49c7-bc11-ef365da52697":{"key":"7502c088-e793-49c7-bc11-ef365da52697","type":"INPUT","order":[]},"ec0b1134-02be-469f-9404-b26c8d8bdd8e":{"key":"ec0b1134-02be-469f-9404-b26c8d8bdd8e","type":"INPUT","order":[]},"24b0ffa1-c70a-4694-869d-613ca02fda2a":{"key":"24b0ffa1-c70a-4694-869d-613ca02fda2a","isPageLayout":false,"dependency":{"f5e2d9b3-ecf8-4b50-acb1-aed99fd0dff1":{"value":["tacacs+"],"mode":"SHOW"}},"dependencyType":"AND","type":"INPUT"},"bca9aac0-21c5-49a5-afb6-c6db43cbfba2":{"key":"bca9aac0-21c5-49a5-afb6-c6db43cbfba2","type":"INPUT","isPageLayout":true},"53a0b2a4-4527-441e-9997-3c058c5d4e27":{"key":"53a0b2a4-4527-441e-9997-3c058c5d4e27","type":"INPUT","isPageLayout":true},"ff977ae0-dfc9-4a52-85cc-af316f665f62":{"key":"ff977ae0-dfc9-4a52-85cc-af316f665f62","type":"INPUT","isPageLayout":true},"dfb237a3-f4a1-467b-8dd9-f76e966a4eed":{"key":"dfb237a3-f4a1-467b-8dd9-f76e966a4eed","dependency":{"f5e2d9b3-ecf8-4b50-acb1-aed99fd0dff1":{"value":["radius"],"mode":"SHOW"}},"type":"INPUT","isPageLayout":false},"03d1ed28-06cd-4c7f-9168-3a19c9895aa1":{"key":"03d1ed28-06cd-4c7f-9168-3a19c9895aa1","type":"INPUT","isPageLayout":true},"1e430af7-6e8d-4fd0-93fc-90ca724f0c8d":{"key":"1e430af7-6e8d-4fd0-93fc-90ca724f0c8d","type":"INPUT","order":["2fe2b29c-c838-471f-b780-57810ce66708","99e5b84b-1dd9-44b5-8690-44df6ddc885b","e7e24c3d-9168-435c-a9d6-07c5367449a4"]},"ce651019-715d-4509-99cb-6519c2c8c2b9":{"key":"ce651019-715d-4509-99cb-6519c2c8c2b9","type":"INPUT","order":["ad551232-55c4-442e-aba4-06346bc65a91","12231643-4772-4bcc-be55-a16f6f24d27a","69a57c6c-e612-43c2-8f6d-cddd94971b71","6d691ad6-866a-4fa6-82b5-1882a5a5d824","d6693c47-f360-40f0-8f58-94eeba66da06","e6871ed6-c5dd-4d60-9711-5958b19727c4"]},"e7b537de-c5a5-4f4e-9673-ffdab365b471":{"key":"e7b537de-c5a5-4f4e-9673-ffdab365b471","type":"INPUT","order":["e11f5e28-4d23-451d-97b8-fc8cdda05af1","2ad38bb1-ad2a-496e-97a9-ee0351a5a9db","aef198ac-3e09-4e7b-b491-15beb50dcc87"]},"c84b1705-d774-45f1-9439-6d177b5e187e":{"key":"c84b1705-d774-45f1-9439-6d177b5e187e","isPageLayout":true,"type":"INPUT"},"bc1aa89d-be98-4c75-879d-bad11aaf472d":{"key":"bc1aa89d-be98-4c75-879d-bad11aaf472d","isPageLayout":false,"type":"INPUT"},"1c2e7a9e-6a16-4126-b23b-8edc3b7c053c":{"key":"1c2e7a9e-6a16-4126-b23b-8edc3b7c053c","dependency":{"92b5233c-f8b4-44b1-b6ba-7b7750c20f0b":{"value":["serial-console","config-commands"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"68fba01f-be80-43a6-bbb0-63cbe0d44a25":{"key":"68fba01f-be80-43a6-bbb0-63cbe0d44a25","type":"INPUT","dependency":{"7bc939b6-938e-4b1d-8794-f74b0ece4116":{"value":[false],"mode":"HIDE"}}},"7bc939b6-938e-4b1d-8794-f74b0ece4116":{"key":"7bc939b6-938e-4b1d-8794-f74b0ece4116","type":"INPUT","dependency":{"8551044b-0e35-4478-a620-734a1c05d8ce":{"value":[true],"mode":"HIDE"}}},"6b3bba9b-db7a-49f4-aa46-504b6b8c23ee":{"key":"6b3bba9b-db7a-49f4-aa46-504b6b8c23ee","dependency":{"8551044b-0e35-4478-a620-734a1c05d8ce":{"value":[true],"mode":"HIDE"},"7bc939b6-938e-4b1d-8794-f74b0ece4116":{"value":[true],"mode":"HIDE"}},"dependencyType":"OR","type":"INPUT"},"8551044b-0e35-4478-a620-734a1c05d8ce":{"key":"8551044b-0e35-4478-a620-734a1c05d8ce","type":"INPUT","dependency":{"6b3bba9b-db7a-49f4-aa46-504b6b8c23ee":{"value":[true],"mode":"HIDE"},"7bc939b6-938e-4b1d-8794-f74b0ece4116":{"value":[true],"mode":"HIDE"}}},"1885c87b-ca29-47d6-93a3-e7b39b492697":{"key":"1885c87b-ca29-47d6-93a3-e7b39b492697","type":"INPUT","dependency":{"782f4c01-5644-472e-9f7c-1224ee00e8e8":{"value":[true],"mode":"HIDE"}}},"1339aff8-5a56-4c4a-afc6-80a37c2ab2cf":{"key":"1339aff8-5a56-4c4a-afc6-80a37c2ab2cf","type":"INPUT","dependency":{"1885c87b-ca29-47d6-93a3-e7b39b492697":{"value":[false],"mode":"HIDE"}}},"9cf0b13d-fbc7-40ec-8ba1-9c70a22187db":{"key":"9cf0b13d-fbc7-40ec-8ba1-9c70a22187db","dependency":{"782f4c01-5644-472e-9f7c-1224ee00e8e8":{"value":[true],"mode":"HIDE"},"1885c87b-ca29-47d6-93a3-e7b39b492697":{"value":[true],"mode":"HIDE"}},"dependencyType":"OR","type":"INPUT"},"9efa173f-0037-4f2a-85bc-cce9ed49332b":{"key":"9efa173f-0037-4f2a-85bc-cce9ed49332b","type":"INPUT","isPageLayout":true},"555589ed-15da-47f8-9660-4887b56443e8":{"key":"555589ed-15da-47f8-9660-4887b56443e8","type":"INPUT","order":["42a467b6-1819-49b4-b7ea-de5a2c68248b"]},"0473ac29-4afa-4df1-9675-29adc5813fd6":{"key":"0473ac29-4afa-4df1-9675-29adc5813fd6","type":"INPUT","order":["5f7657c6-59ef-4ba3-8079-26ab3a086998","e8a2d8ec-9986-4d27-ab71-81892a929d9f","b5a66270-8ec7-4849-ac8c-c18e9a730308"]}}'
+      from_package: ''
