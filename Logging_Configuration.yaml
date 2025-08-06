@@ -1,0 +1,257 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: 5c8687fe-6178-4b6d-9956-c97be6f48c0b
+        workspace_id: ''
+      created_at: '2025-08-05T12:47:31.489Z'
+      created_by: mschulman
+      last_modified_at: '2025-08-06T20:26:49.096Z'
+      last_modified_by: mschulman
+      display_name: Logging Configuration
+      description: Configure Log Hosts and source interface
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: |-
+          % if profileAssignment:
+              <% profileGroup = profileAssignment.resolve()["profileGroup"] %>
+              <% ctx.info(f"profileGroup: {profileGroup}") %>
+
+              <%
+                  loggingProfile = [ host for host in loggingProfiles if host.get("profileName") == profileGroup["loggingProfile"]]
+                  ctx.info(f"loggingProfile: {loggingProfile}")
+                  loggingSource = profileGroup.loggingSourceInterface
+              %>
+
+              % if loggingSource:
+          logging source-interface ${loggingSource}
+              % endif
+
+              % if loggingProfile:
+                  % for logHost in loggingProfile[0].logHosts:
+          logging host ${logHost}
+                  % endfor
+              % endif
+          % endif
+      input_schema:
+        fields:
+          values:
+            faeab834-b888-401c-bec2-a1fbc407a64d:
+              id: faeab834-b888-401c-bec2-a1fbc407a64d
+              type: INPUT_FIELD_TYPE_STRING
+              name: loggingProfile
+              label: Logging Profile
+              description: Logging Profile Name
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"d8380464-8525-4619-9fb1-5307bf97620a"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            92cf9bc2-011e-4931-aaa0-82b9a2e24117:
+              id: 92cf9bc2-011e-4931-aaa0-82b9a2e24117
+              type: INPUT_FIELD_TYPE_GROUP
+              name: profileGroup
+              label: Profile Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - faeab834-b888-401c-bec2-a1fbc407a64d
+                    - 9227bfae-818f-4b2e-95f6-f7975ad05efe
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 7de4c2cd-4820-4f49-9f5b-b38d37644efa
+                    - 58f8d8fc-5477-4c34-a624-be44bf777dcc
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4:
+              id: 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: logHosts
+              label: Log Hosts
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: ec50b9a3-97ad-4f4d-a3fd-dc3b17dfd8ed
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            072cdb35-a7f2-4033-95fd-6d106cdc6a6f:
+              id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Logging Profiles Group
+              description: Group of members for Logging Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - d8380464-8525-4619-9fb1-5307bf97620a
+                    - 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9227bfae-818f-4b2e-95f6-f7975ad05efe:
+              id: 9227bfae-818f-4b2e-95f6-f7975ad05efe
+              type: INPUT_FIELD_TYPE_STRING
+              name: loggingSourceInterface
+              label: Logging Source Interface
+              description: Source interface for sending log messages
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            58f8d8fc-5477-4c34-a624-be44bf777dcc:
+              id: 58f8d8fc-5477-4c34-a624-be44bf777dcc
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: profileAssignment
+              label: Profile Assignment
+              description: Assign a logging profile and source interface to devices, grouped by tags.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: 92cf9bc2-011e-4931-aaa0-82b9a2e24117
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7de4c2cd-4820-4f49-9f5b-b38d37644efa:
+              id: 7de4c2cd-4820-4f49-9f5b-b38d37644efa
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: loggingProfiles
+              label: Logging Profiles
+              description: Configure Profiles containing log hosts that can be assigned to devices
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
+                key: d8380464-8525-4619-9fb1-5307bf97620a
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ec50b9a3-97ad-4f4d-a3fd-dc3b17dfd8ed:
+              id: ec50b9a3-97ad-4f4d-a3fd-dc3b17dfd8ed
+              type: INPUT_FIELD_TYPE_STRING
+              name: logHost
+              label: Log Host
+              description: IP address of Logging server
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d8380464-8525-4619-9fb1-5307bf97620a:
+              id: d8380464-8525-4619-9fb1-5307bf97620a
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
+              label: Profile Name
+              description: Name of the Logging Profile
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"7de4c2cd-4820-4f49-9f5b-b38d37644efa":{"key":"7de4c2cd-4820-4f49-9f5b-b38d37644efa","isPageLayout":true,"type":"INPUT"}}'
+      from_package: ''
