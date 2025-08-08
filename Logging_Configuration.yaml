@@ -5,110 +5,24 @@
       key:
         studio_id: 5c8687fe-6178-4b6d-9956-c97be6f48c0b
         workspace_id: ''
-      created_at: '2025-08-05T12:47:31.489Z'
+      created_at: '2025-08-08T13:19:09.412Z'
       created_by: mschulman
-      last_modified_at: '2025-08-06T20:26:49.096Z'
+      last_modified_at: '2025-08-08T13:25:47.243Z'
       last_modified_by: mschulman
       display_name: Logging Configuration
       description: Configure Log Hosts and source interface
       template:
         type: TEMPLATE_TYPE_MAKO
-        body: |-
-          % if profileAssignment:
-              <% profileGroup = profileAssignment.resolve()["profileGroup"] %>
-              <% ctx.info(f"profileGroup: {profileGroup}") %>
-
-              <%
-                  loggingProfile = [ host for host in loggingProfiles if host.get("profileName") == profileGroup["loggingProfile"]]
-                  ctx.info(f"loggingProfile: {loggingProfile}")
-                  loggingSource = profileGroup.loggingSourceInterface
-              %>
-
-              % if loggingSource:
-          logging source-interface ${loggingSource}
-              % endif
-
-              % if loggingProfile:
-                  % for logHost in loggingProfile[0].logHosts:
-          logging host ${logHost}
-                  % endfor
-              % endif
-          % endif
+        body: "% if profileAssignment:\n    <% profileGroup = profileAssignment.resolve()[\"profileGroup\"] %>\n    <% ctx.info(f\"profileGroup: {profileGroup}\") %>\n\n    <%\n        # Use a list comprehension to find the profile dictionary that has a key that matches the name of the profile assigned\n        # to the Resolver.  This will result in a list with one dictionary in it.\n        loggingProfileList = [ profile for profile in loggingProfiles if profile.get(\"profileName\") == profileGroup[\"loggingProfile\"]]\n        vrfSourceProfileList = [ profile for profile in vrfAndSourceProfiles if profile.get(\"profileName\") == profileGroup[\"vrfSourceProfile\"]]\n\n        # Create empty Profile dictionaries so that devices added to the studio but aren't matched to a Resolver\n\t    # will still have the variable created and not generate an error on studio build.\n        loggingProfile = {}\n        vrfSourceProfile = {}\n\n        # Because the profile list variable is a list, extract the first item in the list and assign to the profile variable.\n        if loggingProfileList:\n            loggingProfile = loggingProfileList[0]\n            ctx.info(f\"loggingProfile: {loggingProfile}\")\n        endif\n        \n        if vrfSourceProfileList:\n            vrfSourceProfile = vrfSourceProfileList[0]\n            ctx.info(f\"vrfSourceProfile: {vrfSourceProfile}\")\n        endif\n\n    %>\n\n    % if vrfSourceProfile:\n        % for vrfSource in vrfSourceProfile.vrfAndSources:\n            % if vrfSource.vrf:\nlogging vrf ${vrfSource.vrf} source-interface ${vrfSource.sourceInterface}\n            % else:\nlogging source-interface ${vrfSource.sourceInterface}\n            % endif\n        % endfor\n    % endif\n\n    % if loggingProfile:\n        % for logHost in loggingProfile.logHosts:\n            % if logHost.vrf:\nlogging vrf ${logHost.vrf} host ${logHost.logHost}\n            % else:\nlogging host ${logHost.logHost}\n            % endif\n        % endfor\n    % endif\n% endif"
       input_schema:
         fields:
           values:
-            faeab834-b888-401c-bec2-a1fbc407a64d:
-              id: faeab834-b888-401c-bec2-a1fbc407a64d
-              type: INPUT_FIELD_TYPE_STRING
-              name: loggingProfile
-              label: Logging Profile
-              description: Logging Profile Name
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options:
-                  values:
-                    - '{"fieldId":"d8380464-8525-4619-9fb1-5307bf97620a"}'
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            92cf9bc2-011e-4931-aaa0-82b9a2e24117:
-              id: 92cf9bc2-011e-4931-aaa0-82b9a2e24117
-              type: INPUT_FIELD_TYPE_GROUP
-              name: profileGroup
-              label: Profile Group
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - faeab834-b888-401c-bec2-a1fbc407a64d
-                    - 9227bfae-818f-4b2e-95f6-f7975ad05efe
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            root:
-              id: root
-              type: INPUT_FIELD_TYPE_GROUP
-              name: ''
-              label: ''
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 7de4c2cd-4820-4f49-9f5b-b38d37644efa
-                    - 58f8d8fc-5477-4c34-a624-be44bf777dcc
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: null
-              tag_matcher_props: null
-            802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4:
-              id: 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
+            7de4c2cd-4820-4f49-9f5b-b38d37644efa:
+              id: 7de4c2cd-4820-4f49-9f5b-b38d37644efa
               type: INPUT_FIELD_TYPE_COLLECTION
-              name: logHosts
-              label: Log Hosts
-              description: ''
+              name: loggingProfiles
+              label: Logging Profiles
+              description: Configure Profiles containing log hosts that can be assigned to devices
               required: false
               boolean_props: null
               integer_props: null
@@ -116,37 +30,17 @@
               string_props: null
               group_props: null
               collection_props:
-                base_field_id: ec50b9a3-97ad-4f4d-a3fd-dc3b17dfd8ed
-                key: null
+                base_field_id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
+                key: d8380464-8525-4619-9fb1-5307bf97620a
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            072cdb35-a7f2-4033-95fd-6d106cdc6a6f:
-              id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: Logging Profiles Group
-              description: Group of members for Logging Profiles
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - d8380464-8525-4619-9fb1-5307bf97620a
-                    - 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            9227bfae-818f-4b2e-95f6-f7975ad05efe:
-              id: 9227bfae-818f-4b2e-95f6-f7975ad05efe
+            d8380464-8525-4619-9fb1-5307bf97620a:
+              id: d8380464-8525-4619-9fb1-5307bf97620a
               type: INPUT_FIELD_TYPE_STRING
-              name: loggingSourceInterface
-              label: Logging Source Interface
-              description: Source interface for sending log messages
+              name: profileName
+              label: Profile Name
+              description: Name of the Logging Profile
               required: false
               boolean_props: null
               integer_props: null
@@ -186,12 +80,36 @@
                 tag_filter_query: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            7de4c2cd-4820-4f49-9f5b-b38d37644efa:
-              id: 7de4c2cd-4820-4f49-9f5b-b38d37644efa
+            e95a0610-c80b-41c3-b14c-7a869c8db141:
+              id: e95a0610-c80b-41c3-b14c-7a869c8db141
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: If the source-interface is in the default VRF, leave blank.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a6d611ec-3078-4737-a569-8df76dae0040:
+              id: a6d611ec-3078-4737-a569-8df76dae0040
               type: INPUT_FIELD_TYPE_COLLECTION
-              name: loggingProfiles
-              label: Logging Profiles
-              description: Configure Profiles containing log hosts that can be assigned to devices
+              name: vrfAndSourceProfiles
+              label: VRF and Source Profiles
+              description: ''
               required: false
               boolean_props: null
               integer_props: null
@@ -199,8 +117,225 @@
               string_props: null
               group_props: null
               collection_props:
-                base_field_id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
-                key: d8380464-8525-4619-9fb1-5307bf97620a
+                base_field_id: 89cb4aac-2fcf-4ca0-8645-a1a6516f651b
+                key: 87105265-f440-4353-80b2-6c0492fb525d
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            92cf9bc2-011e-4931-aaa0-82b9a2e24117:
+              id: 92cf9bc2-011e-4931-aaa0-82b9a2e24117
+              type: INPUT_FIELD_TYPE_GROUP
+              name: profileGroup
+              label: Profile Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - faeab834-b888-401c-bec2-a1fbc407a64d
+                    - d8f48832-ffda-4307-bf11-c3c607c7c6fe
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            faeab834-b888-401c-bec2-a1fbc407a64d:
+              id: faeab834-b888-401c-bec2-a1fbc407a64d
+              type: INPUT_FIELD_TYPE_STRING
+              name: loggingProfile
+              label: Logging Profile
+              description: Logging Profile Name
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"d8380464-8525-4619-9fb1-5307bf97620a"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6ab3dc15-2891-4adf-b189-d6bfc69c8665:
+              id: 6ab3dc15-2891-4adf-b189-d6bfc69c8665
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfAndSources
+              label: VRF and Sources
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 48d55f8a-161e-4c35-b44e-03aeb1441f73
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            87105265-f440-4353-80b2-6c0492fb525d:
+              id: 87105265-f440-4353-80b2-6c0492fb525d
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
+              label: ProfileName
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 7de4c2cd-4820-4f49-9f5b-b38d37644efa
+                    - a6d611ec-3078-4737-a569-8df76dae0040
+                    - 58f8d8fc-5477-4c34-a624-be44bf777dcc
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            072cdb35-a7f2-4033-95fd-6d106cdc6a6f:
+              id: 072cdb35-a7f2-4033-95fd-6d106cdc6a6f
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Logging Profiles Group
+              description: Group of members for Logging Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - d8380464-8525-4619-9fb1-5307bf97620a
+                    - 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            8f4c552f-c3f5-4cd7-9adc-bb3efbf4ee62:
+              id: 8f4c552f-c3f5-4cd7-9adc-bb3efbf4ee62
+              type: INPUT_FIELD_TYPE_STRING
+              name: sourceInterface
+              label: Source Interface
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            89cb4aac-2fcf-4ca0-8645-a1a6516f651b:
+              id: 89cb4aac-2fcf-4ca0-8645-a1a6516f651b
+              type: INPUT_FIELD_TYPE_GROUP
+              name: vrfAndSourceProfilesGroup
+              label: VRF and Source Profiles Group
+              description: Group of members for VRF and Source Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 87105265-f440-4353-80b2-6c0492fb525d
+                    - 6ab3dc15-2891-4adf-b189-d6bfc69c8665
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            19a64038-03c0-4645-a7d9-2e6ee90325b8:
+              id: 19a64038-03c0-4645-a7d9-2e6ee90325b8
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Log Hosts Group
+              description: Group of members for Log Hosts
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - ec50b9a3-97ad-4f4d-a3fd-dc3b17dfd8ed
+                    - 92c3059f-cea8-4555-be18-4e57fd6eb53c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            92c3059f-cea8-4555-be18-4e57fd6eb53c:
+              id: 92c3059f-cea8-4555-be18-4e57fd6eb53c
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
@@ -228,12 +363,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            d8380464-8525-4619-9fb1-5307bf97620a:
-              id: d8380464-8525-4619-9fb1-5307bf97620a
+            d8f48832-ffda-4307-bf11-c3c607c7c6fe:
+              id: d8f48832-ffda-4307-bf11-c3c607c7c6fe
               type: INPUT_FIELD_TYPE_STRING
-              name: profileName
-              label: Profile Name
-              description: Name of the Logging Profile
+              name: vrfSourceProfile
+              label: VRF and Source Profile
+              description: ''
               required: false
               boolean_props: null
               integer_props: null
@@ -241,7 +376,9 @@
               string_props:
                 default_value: null
                 static_options: null
-                dynamic_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"87105265-f440-4353-80b2-6c0492fb525d"}'
                 length: null
                 pattern: null
                 format: null
@@ -252,6 +389,44 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
+            48d55f8a-161e-4c35-b44e-03aeb1441f73:
+              id: 48d55f8a-161e-4c35-b44e-03aeb1441f73
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: VRF and Sources Group
+              description: Group of members for VRF and Sources
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - e95a0610-c80b-41c3-b14c-7a869c8db141
+                    - 8f4c552f-c3f5-4cd7-9adc-bb3efbf4ee62
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4:
+              id: 802b7e1c-7b73-4ab5-92c2-4f3ee6e288f4
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: logHosts
+              label: Log Hosts
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 19a64038-03c0-4645-a7d9-2e6ee90325b8
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
         layout:
-          value: '{"7de4c2cd-4820-4f49-9f5b-b38d37644efa":{"key":"7de4c2cd-4820-4f49-9f5b-b38d37644efa","isPageLayout":true,"type":"INPUT"}}'
+          value: '{"7de4c2cd-4820-4f49-9f5b-b38d37644efa":{"key":"7de4c2cd-4820-4f49-9f5b-b38d37644efa","isPageLayout":true,"type":"INPUT"},"a6d611ec-3078-4737-a569-8df76dae0040":{"key":"a6d611ec-3078-4737-a569-8df76dae0040","type":"INPUT","isPageLayout":true}}'
       from_package: ''
