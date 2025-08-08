@@ -7,468 +7,57 @@
         workspace_id: ''
       created_at: '2025-08-06T19:04:07.953Z'
       created_by: mschulman
-      last_modified_at: '2025-08-07T14:10:55.093Z'
+      last_modified_at: '2025-08-08T13:36:03.535Z'
       last_modified_by: mschulman
       display_name: SNMP Configuration
       description: Studio for configuring SNMP v1 and v2 communities and trap hosts
       template:
         type: TEMPLATE_TYPE_MAKO
-        body: |-
-          % if snmpProfileAssignResolver:
-              <% 
-                  snmpProfilesGroup = snmpProfileAssignResolver.resolve()["snmpProfileGroup"]
-                  ctx.info(f"SNMP Group: {snmpProfilesGroup}")
-
-                  snmpCommProfileList = [ profile for profile in snmpCommunityProfiles if profile.get("profileName") == snmpProfilesGroup["snmpCommunityProfile"]]
-                  if snmpCommProfileList:
-                      snmpCommProfile = snmpCommProfileList[0]
-                      ctx.info(f"snmpCommProfile: {snmpCommProfile}")
-                  endif
-                  
-                  snmpLocationContactProfileList = [ profile for profile in snmpLocationContactProfiles if profile.get("profileName") == snmpProfilesGroup["snmpLocationContactProfile"]]
-                  if snmpLocationContactProfileList:
-                      snmpLocContProfile = snmpLocationContactProfileList[0]
-                      ctx.info(f"snmpLocContProfile: {snmpLocContProfile}")
-                  endif
-
-                  snmpTrapHostProfileList = [ profile for profile in snmpTrapHostProfiles if profile.get("profileName") == snmpProfilesGroup["snmpTrapHostProfile"]]
-                  if snmpTrapHostProfileList:
-                      snmpTrapHostProfile = snmpTrapHostProfileList[0]
-                      ctx.info(f"snmpTrapHostProfile: {snmpTrapHostProfile}")
-                  endif
-
-                  snmpTrapProfileList = [ profile for profile in snmpTrapProfiles if profile.get("trapProfileName") == snmpProfilesGroup["snmpTrapProfile"]]
-                  if snmpTrapProfileList:
-                      snmpTrapProfile = snmpTrapProfileList[0]
-                      ctx.info(f"snmpTrapProfile: {snmpTrapProfile}")
-                  endif
-
-                  vrfSourceProfileList = [ profile for profile in vrfAndSourceProfiles if profile.get("vrfProfileName") == snmpProfilesGroup["vrfSourceProfile"]]
-                  if vrfSourceProfileList:
-                      vrfSourceProfile = vrfSourceProfileList[0]
-                      ctx.info(f"vrfSourceProfile: {vrfSourceProfile}")
-                  endif
-              %>
-
-              % if snmpCommProfileList:
-                  % if snmpCommProfile.snmpAcls:
-                      % for acl in snmpCommProfile.snmpAcls:
-          ip access-list standard ${acl.aclName}
-                          % for aclLine in acl.aclLines:
-                              % if aclLine.permitDenyRemark != "remark":
-                                  % if aclLine.anySource:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any
-                                      % endif
-                                  % elif aclLine.isHost:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP} log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP}
-                                      % endif
-                                  % else:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask} log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask}
-                                      % endif
-                                  % endif
-                              % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.description} 
-                              % endif
-                          % endfor
-                      % endfor 
-                  % endif
-                  % if snmpCommProfile.snmpCommunities:
-                      % for community in snmpCommProfile.snmpCommunities:
-                          <%
-                              communityName = community.snmpCommunity
-                              if community.snmpCommunityMode:
-                                  communityMode = community.snmpCommunityMode
-                              if community.snmpCommunityAcl:
-                                  communityACL = community.snmpCommunityAcl
-                          %>
-                          % if community.snmpCommunity:
-          snmp-server community ${communityName}\
-                              % if community.snmpCommunityMode:
-           ${communityMode}\
-                              % endif
-                              % if community.snmpCommunityAcl:
-           ${communityACL}
-                              % endif
-                          % endif
-                      % endfor
-                  % endif       
-          ${snmpCommProfile.get("eosCli")}
-              % endif
-
-              % if snmpLocationContactProfileList:
-                  % if snmpLocContProfile.snmpLocation:
-          snmp-server location ${snmpLocContProfile.snmpLocation}
-                  % endif
-                  % if snmpLocContProfile.snmpContact:
-          snmp-server contact ${snmpLocContProfile.snmpContact}
-                  % endif
-              % endif
-
-              % if snmpTrapHostProfileList:
-                  % if snmpTrapHostProfile.snmpTrapHosts:
-                      % for trapHost in snmpTrapHostProfile.snmpTrapHosts:
-                          % if trapHost.snmpTrapHost:
-          snmp-server host ${trapHost.snmpTrapHost} \
-                              % if trapHost.vrf:
-           vrf ${trapHost.vrf}\
-                              % endif
-                              % if trapHost.enableTraps:
-           traps\
-                              % elif trapHost.enableInforms:
-           informs\
-                              % endif
-                              % if trapHost.refreshDNS:
-           refresh\
-                              % endif
-                              % if trapHost.snmpTrapVersion:
-           version ${trapHost.snmpTrapVersion} \
-                              % endif
-                              % if trapHost.snmpTrapCommunity and trapHost.snmpTrapPort:
-           ${trapHost.snmpTrapCommunity} \
-                              % else:
-           ${trapHost.snmpTrapCommunity}   
-                              % endif
-                              % if trapHost.snmpTrapPort:
-           udp-port ${trapHost.snmpTrapPort}
-                              % endif
-                          % endif
-                      % endfor
-                  % endif
-          ${snmpTrapHostProfile.eosCli}
-              % endif
-
-              % if snmpTrapProfileList:
-                  % if snmpTrapProfile.enableBgpTraps:
-          snmp-server enable traps bgp
-                  % endif
-                  % if snmpTrapProfile.enableBridgeTraps:
-          snmp-server enable traps bridge
-                  % endif
-                  % if snmpTrapProfile.enableCapacityTraps:
-          snmp-server enable traps capacity
-                  % endif
-                  % if snmpTrapProfile.enableClbTraps:
-          snmp-server enable traps clb
-                  % endif
-                  % if snmpTrapProfile.enableEntityTraps:
-          snmp-server enable traps entity
-                  % endif
-                  % if snmpTrapProfile.enableExternalAlarmTraps:
-          snmp-server enable traps external-alarm
-                  % endif
-                  % if snmpTrapProfile.enableIsIsTraps:
-          snmp-server enable traps isis
-                  % endif
-                  % if snmpTrapProfile.enableLldpTraps:
-          snmp-server enable traps lldp
-                  % endif
-                  % if snmpTrapProfile.enableMplsLdpTraps:
-          snmp-server enable traps mpls-ldp
-                  % endif
-                  % if snmpTrapProfile.enableMsdpTraps:
-          snmp-server enable traps msdp
-                  % endif
-                  % if snmpTrapProfile.enableOspFv3Traps:
-          snmp-server enable traps ospfv3
-                  % endif
-                  % if snmpTrapProfile.enableOspfTraps:
-          snmp-server enable traps ospf
-                  % endif
-                  % if snmpTrapProfile.enablePimTraps:
-          snmp-server enable traps pim
-                  % endif
-                  % if snmpTrapProfile.enableSnmpTraps:
-          snmp-server enable traps snmp
-                  % endif
-                  % if snmpTrapProfile.enableSnmpConfigManEventTraps:
-          snmp-server enable traps snmpConfigManEvent
-                  % endif
-                  % if snmpTrapProfile.enableSwitchoverTraps:
-          snmp-server enable traps switchover
-                  % endif
-                  % if snmpTrapProfile.enableTestTraps:
-          snmp-server enable traps test
-                  % endif
-                  % if snmpTrapProfile.enableVrrpTraps:
-          snmp-server enable traps vrrp
-                  % endif
-          ${snmpTrapProfile.eosCli}
-              % endif
-
-              % if vrfSourceProfileList:
-                  % if vrfSourceProfile.vrfProfiles:
-                      % for vrfProfile in vrfSourceProfile.vrfProfiles:
-                          % if vrfProfile.vrf:
-          snmp-server vrf ${vrfProfile.vrf} local-interface ${vrfProfile.localInterface}
-                          % else:
-          snmp-server local-interface ${vrfProfile.localInterface}
-                          % endif
-                      % endfor
-                  % endif
-              % endif
-          % endif
-                      
+        body: "% if snmpProfileAssignResolver:\n    <% \n        snmpProfilesGroup = snmpProfileAssignResolver.resolve()[\"snmpProfileGroup\"]\n        ctx.info(f\"SNMP Group: {snmpProfilesGroup}\")\n\n        # Use a list comprehension to find the profile dictionary that has a key that matches the name of the profile assigned\n        # to the Resolver.  This will result in a list with one dictionary in it.\n        snmpCommProfileList = [ profile for profile in snmpCommunityProfiles if profile.get(\"profileName\") == snmpProfilesGroup[\"snmpCommunityProfile\"]]\n        snmpLocationContactProfileList = [ profile for profile in snmpLocationContactProfiles if profile.get(\"profileName\") == snmpProfilesGroup[\"snmpLocationContactProfile\"]]\n        snmpTrapHostProfileList = [ profile for profile in snmpTrapHostProfiles if profile.get(\"profileName\") == snmpProfilesGroup[\"snmpTrapHostProfile\"]]\n        snmpTrapProfileList = [ profile for profile in snmpTrapProfiles if profile.get(\"trapProfileName\") == snmpProfilesGroup[\"snmpTrapProfile\"]]\n        vrfSourceProfileList = [ profile for profile in vrfAndSourceProfiles if profile.get(\"vrfProfileName\") == snmpProfilesGroup[\"vrfSourceProfile\"]]\n\n        # Create empty Profile dictionaries so that devices added to the studio but aren't matched to a Resolver\n\t    # will still have the variable created and not generate an error on studio build.\n        snmpCommProfile = {}\n        snmpLocContProfile = {}\n        snmpTrapHostProfile = {}\n        snmpTrapProfile = {}\n        vrfSourceProfile = {}\n\n        # Because the profile list variable is a list, extract the first item in the list and assign to the profile variable.\n        if snmpCommProfileList:\n            snmpCommProfile = snmpCommProfileList[0]\n            ctx.info(f\"snmpCommProfile: {snmpCommProfile}\")\n        endif\n                \n        if snmpLocationContactProfileList:\n            snmpLocContProfile = snmpLocationContactProfileList[0]\n            ctx.info(f\"snmpLocContProfile: {snmpLocContProfile}\")\n        endif\n\n        if snmpTrapHostProfileList:\n            snmpTrapHostProfile = snmpTrapHostProfileList[0]\n            ctx.info(f\"snmpTrapHostProfile: {snmpTrapHostProfile}\")\n        endif\n\n        if snmpTrapProfileList:\n            snmpTrapProfile = snmpTrapProfileList[0]\n            ctx.info(f\"snmpTrapProfile: {snmpTrapProfile}\")\n        endif\n\n        if vrfSourceProfileList:\n            vrfSourceProfile = vrfSourceProfileList[0]\n            ctx.info(f\"vrfSourceProfile: {vrfSourceProfile}\")\n        endif\n    %>\n\n    % if snmpCommProfile:\n        % if snmpCommProfile.snmpAcls:\n            % for acl in snmpCommProfile.snmpAcls:\nip access-list standard ${acl.aclName}\n                % for aclLine in acl.aclLines:\n                    % if aclLine.permitDenyRemark != \"remark\":\n                        % if aclLine.anySource:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any\n                            % endif\n                        % elif aclLine.isHost:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP} log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP}\n                            % endif\n                        % else:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask} log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask}\n                            % endif\n                        % endif\n                    % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.description} \n                    % endif\n                % endfor\n            % endfor \n        % endif\n        % if snmpCommProfile.snmpCommunities:\n            % for community in snmpCommProfile.snmpCommunities:\n                <%\n                    communityName = community.snmpCommunity\n                    if community.snmpCommunityMode:\n                        communityMode = community.snmpCommunityMode\n                    if community.snmpCommunityAcl:\n                        communityACL = community.snmpCommunityAcl\n                %>\n                % if community.snmpCommunity:\nsnmp-server community ${communityName}\\\n                    % if community.snmpCommunityMode:\n ${communityMode}\\\n                    % endif\n                    % if community.snmpCommunityAcl:\n ${communityACL}\n                    % endif\n                % endif\n            % endfor\n        % endif       \n${snmpCommProfile.get(\"eosCli\")}\n    % endif\n\n    % if snmpLocationContactProfile:\n        % if snmpLocContProfile.snmpLocation:\nsnmp-server location ${snmpLocContProfile.snmpLocation}\n        % endif\n        % if snmpLocContProfile.snmpContact:\nsnmp-server contact ${snmpLocContProfile.snmpContact}\n        % endif\n    % endif\n\n    % if snmpTrapHostProfile:\n        % if snmpTrapHostProfile.snmpTrapHosts:\n            % for trapHost in snmpTrapHostProfile.snmpTrapHosts:\n                % if trapHost.snmpTrapHost:\nsnmp-server host ${trapHost.snmpTrapHost} \\\n                    % if trapHost.vrf:\n vrf ${trapHost.vrf}\\\n                    % endif\n                    % if trapHost.enableTraps:\n traps\\\n                    % elif trapHost.enableInforms:\n informs\\\n                    % endif\n                    % if trapHost.refreshDNS:\n refresh\\\n                    % endif\n                    % if trapHost.snmpTrapVersion:\n version ${trapHost.snmpTrapVersion} \\\n                    % endif\n                    % if trapHost.snmpTrapCommunity and trapHost.snmpTrapPort:\n ${trapHost.snmpTrapCommunity} \\\n                    % else:\n ${trapHost.snmpTrapCommunity}   \n                    % endif\n                    % if trapHost.snmpTrapPort:\n udp-port ${trapHost.snmpTrapPort}\n                    % endif\n                % endif\n            % endfor\n        % endif\n${snmpTrapHostProfile.eosCli}\n    % endif\n\n    % if snmpTrapProfile:\n        % if snmpTrapProfile.enableBgpTraps:\nsnmp-server enable traps bgp\n        % endif\n        % if snmpTrapProfile.enableBridgeTraps:\nsnmp-server enable traps bridge\n        % endif\n        % if snmpTrapProfile.enableCapacityTraps:\nsnmp-server enable traps capacity\n        % endif\n        % if snmpTrapProfile.enableClbTraps:\nsnmp-server enable traps clb\n        % endif\n        % if snmpTrapProfile.enableEntityTraps:\nsnmp-server enable traps entity\n        % endif\n        % if snmpTrapProfile.enableExternalAlarmTraps:\nsnmp-server enable traps external-alarm\n        % endif\n        % if snmpTrapProfile.enableIsIsTraps:\nsnmp-server enable traps isis\n        % endif\n        % if snmpTrapProfile.enableLldpTraps:\nsnmp-server enable traps lldp\n        % endif\n        % if snmpTrapProfile.enableMplsLdpTraps:\nsnmp-server enable traps mpls-ldp\n        % endif\n        % if snmpTrapProfile.enableMsdpTraps:\nsnmp-server enable traps msdp\n        % endif\n        % if snmpTrapProfile.enableOspFv3Traps:\nsnmp-server enable traps ospfv3\n        % endif\n        % if snmpTrapProfile.enableOspfTraps:\nsnmp-server enable traps ospf\n        % endif\n        % if snmpTrapProfile.enablePimTraps:\nsnmp-server enable traps pim\n        % endif\n        % if snmpTrapProfile.enableSnmpTraps:\nsnmp-server enable traps snmp\n        % endif\n        % if snmpTrapProfile.enableSnmpConfigManEventTraps:\nsnmp-server enable traps snmpConfigManEvent\n        % endif\n        % if snmpTrapProfile.enableSwitchoverTraps:\nsnmp-server enable traps switchover\n        % endif\n        % if snmpTrapProfile.enableTestTraps:\nsnmp-server enable traps test\n        % endif\n        % if snmpTrapProfile.enableVrrpTraps:\nsnmp-server enable traps vrrp\n        % endif\n${snmpTrapProfile.eosCli}\n    % endif\n\n    % if vrfSourceProfile:\n        % if vrfSourceProfile.vrfProfiles:\n            % for vrfProfile in vrfSourceProfile.vrfProfiles:\n                % if vrfProfile.vrf:\nsnmp-server vrf ${vrfProfile.vrf} local-interface ${vrfProfile.localInterface}\n                % else:\nsnmp-server local-interface ${vrfProfile.localInterface}\n                % endif\n            % endfor\n        % endif\n    % endif\n% endif\n            "
       input_schema:
         fields:
           values:
+            d0128a22-e361-4ed9-9f5e-f09f3da55ab3:
+              id: d0128a22-e361-4ed9-9f5e-f09f3da55ab3
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpCommunities
+              label: SNMP Communities
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: b313c4c5-f2b1-4874-b124-0976c09ff27b
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d1390f77-b6cf-47a3-b7a7-ec24be30c421:
+              id: d1390f77-b6cf-47a3-b7a7-ec24be30c421
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableVrrpTraps
+              label: Enable VRRP Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
             129da7a1-e3a0-4b9b-8638-c549459d5d08:
               id: 129da7a1-e3a0-4b9b-8638-c549459d5d08
               type: INPUT_FIELD_TYPE_BOOLEAN
               name: enableTraps
               label: enableTraps
               description: Use SNMP Trap Messages
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            3f2e2168-a151-41af-ba33-1f31050f8b14:
-              id: 3f2e2168-a151-41af-ba33-1f31050f8b14
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableInforms
-              label: enableInforms
-              description: Use SNMP Inform messages
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a2ad4c9d-3787-4613-ae8e-87e2d100785b:
-              id: a2ad4c9d-3787-4613-ae8e-87e2d100785b
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpAcls
-              label: SNMP ACLs
-              description: Create Standard IP ACLs to use with Communities
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
-                key: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            65c2a79c-c370-45c1-8c3e-c2494f0b8c19:
-              id: 65c2a79c-c370-45c1-8c3e-c2494f0b8c19
-              type: INPUT_FIELD_TYPE_GROUP
-              name: snmpProfileGroup
-              label: SNMP Profile Assignment Group
-              description: Group of members for SNMP Profile Assignment
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - d5e87ff2-921b-400c-9e0e-104f51a0f8f5
-                    - e43b1da5-fa92-4701-b250-cbfe991fe4c1
-                    - cd3db0b3-4098-4451-89e2-e1cae8e4e4b6
-                    - edf5afd0-7d58-4f78-a0b3-889ab7eeb112
-                    - 4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            b4b06667-e063-435a-8b27-e541cd8d321d:
-              id: b4b06667-e063-435a-8b27-e541cd8d321d
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpLocation
-              label: SNMP Location
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            f2b76f49-0887-4026-94d6-ab3c7a5413b3:
-              id: f2b76f49-0887-4026-94d6-ab3c7a5413b3
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpLocationContactProfiles
-              label: SNMP Location and Contact Profiles
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 2346c223-880d-4c08-b799-7b61fdb3f45c
-                key: 7cca9d7b-ceef-43c9-ab29-f4bdd03fa633
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            d64cc020-7563-4803-a247-0da400033dd1:
-              id: d64cc020-7563-4803-a247-0da400033dd1
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpTrapHost
-              label: SNMP Trap Host
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            56280cfb-2dc1-43e4-9edf-20efd514f2b8:
-              id: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
-              type: INPUT_FIELD_TYPE_STRING
-              name: aclName
-              label: ACL Name
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a3c585c6-a656-42bc-98af-0c09fb4a4606:
-              id: a3c585c6-a656-42bc-98af-0c09fb4a4606
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: log
-              label: Log
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            edf5afd0-7d58-4f78-a0b3-889ab7eeb112:
-              id: edf5afd0-7d58-4f78-a0b3-889ab7eeb112
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpTrapProfile
-              label: SNMP Trap Profile
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options:
-                  values:
-                    - '{"fieldId":"3f04d942-deda-48d3-a6aa-72f7c1c14b20"}'
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            ff662aaa-f1bf-44e5-9b86-52570312c106:
-              id: ff662aaa-f1bf-44e5-9b86-52570312c106
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpTrapProfiles
-              label: SNMP Trap Profiles
-              description: Create profiles that enable traps to send to trap hosts.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 1b34d20a-668c-4c5a-a101-28c79b20caed
-                key: 3f04d942-deda-48d3-a6aa-72f7c1c14b20
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            c37f5557-9a45-4809-be59-d0e36c694ed8:
-              id: c37f5557-9a45-4809-be59-d0e36c694ed8
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableOspFv3Traps
-              label: Enable OSPFv3 Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            3aa99096-90fa-4a41-bfbe-eb093def8e51:
-              id: 3aa99096-90fa-4a41-bfbe-eb093def8e51
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableCapacityTraps
-              label: Enable Capacity Traps
-              description: ''
               required: false
               boolean_props:
                 default_value: false
@@ -506,10 +95,483 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8:
-              id: a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
+            e43b1da5-fa92-4701-b250-cbfe991fe4c1:
+              id: e43b1da5-fa92-4701-b250-cbfe991fe4c1
               type: INPUT_FIELD_TYPE_STRING
-              name: profileName
+              name: snmpLocationContactProfile
+              label: SNMP Location and Contact Profile
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"7cca9d7b-ceef-43c9-ab29-f4bdd03fa633"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f1d71f56-f244-41b7-9801-eaf0894440a2:
+              id: f1d71f56-f244-41b7-9801-eaf0894440a2
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpContact
+              label: SNMP Contact
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            51f666f6-dd04-4c57-9ad9-476e1e04597b:
+              id: 51f666f6-dd04-4c57-9ad9-476e1e04597b
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableBridgeTraps
+              label: Enable Bridge Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d64cc020-7563-4803-a247-0da400033dd1:
+              id: d64cc020-7563-4803-a247-0da400033dd1
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapHost
+              label: SNMP Trap Host
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f7cf96f2-c563-4bd4-b5b1-5b391b7bb381:
+              id: f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: snmpTrapPort
+              label: SNMP Trap Port
+              description: The UDP Port to send the Trap on if different than 162
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            55e4425e-e5da-4d1b-89e2-f155d136eb81:
+              id: 55e4425e-e5da-4d1b-89e2-f155d136eb81
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpTrapHostProfiles
+              label: SNMP Trap Host Profiles
+              description: Create a profile containing SNMP Trap Settings.  These can then be assigned to devices.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51
+                key: aaeddc78-386e-4625-9795-f2b68e7fe6f3
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9868c529-38ba-477f-8f8b-be318c4b90c6:
+              id: 9868c529-38ba-477f-8f8b-be318c4b90c6
+              type: INPUT_FIELD_TYPE_STRING
+              name: localInterface
+              label: Local Interface
+              description: The Source Interface to use for SNMP Traps
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            23bd8dbc-5937-4918-88fb-9b53c6cfc878:
+              id: 23bd8dbc-5937-4918-88fb-9b53c6cfc878
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableMsdpTraps
+              label: Enable MSDP Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a407012c-abe1-45f3-8cd7-fae0b8ba9cfb:
+              id: a407012c-abe1-45f3-8cd7-fae0b8ba9cfb
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpCommunityProfiles
+              label: SNMP Community Profiles
+              description: Create Profiles containing SNMP Communities and Standard ACLs.  These Profiles can then be assigned to device(s).
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: b3f4ce96-df42-4afb-8998-bf20d8530b90
+                key: a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            85838f5c-46cf-43a0-b4d0-dce1638df6b9:
+              id: 85838f5c-46cf-43a0-b4d0-dce1638df6b9
+              type: INPUT_FIELD_TYPE_STRING
+              name: wildcardMask
+              label: Wildcard Mask
+              description: Wildcard mask if source is a network address and was not input in CIDR notation
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bd60058a-8a3d-43e2-9b22-c2862c53cc0f:
+              id: bd60058a-8a3d-43e2-9b22-c2862c53cc0f
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableClbTraps
+              label: Enable CLB Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            940b8968-b391-4c7f-8afc-d69a032655e9:
+              id: 940b8968-b391-4c7f-8afc-d69a032655e9
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableSnmpConfigManEventTraps
+              label: Enable snmpConfigManEvent Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3aa99096-90fa-4a41-bfbe-eb093def8e51:
+              id: 3aa99096-90fa-4a41-bfbe-eb093def8e51
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableCapacityTraps
+              label: Enable Capacity Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - a407012c-abe1-45f3-8cd7-fae0b8ba9cfb
+                    - f2b76f49-0887-4026-94d6-ab3c7a5413b3
+                    - 55e4425e-e5da-4d1b-89e2-f155d136eb81
+                    - ff662aaa-f1bf-44e5-9b86-52570312c106
+                    - 5ef2efa3-6118-4218-9655-070c310d53fe
+                    - 43e2aa39-7b4d-446a-a8e4-12a6ec5ca84a
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            a3c585c6-a656-42bc-98af-0c09fb4a4606:
+              id: a3c585c6-a656-42bc-98af-0c09fb4a4606
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: log
+              label: Log
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            020dc026-e59f-4656-a3c9-eec998727f79:
+              id: 020dc026-e59f-4656-a3c9-eec998727f79
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpCommunityAcl
+              label: SNMP Community ACL
+              description: Limit access to the community with an ACL
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"56280cfb-2dc1-43e4-9edf-20efd514f2b8"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: true
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1793d6ac-9ed7-49d4-893a-7d7935c3ac2b:
+              id: 1793d6ac-9ed7-49d4-893a-7d7935c3ac2b
+              type: INPUT_FIELD_TYPE_STRING
+              name: eosCli
+              label: EOS CLI
+              description: Additional CLI Commands.  These commands will override studio-generated commands if there is s conflict.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51:
+              id: a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: SNMP Trap Host Profiles Group
+              description: Group of members for SNMP Trap Host Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - aaeddc78-386e-4625-9795-f2b68e7fe6f3
+                    - bdfe530e-4738-4b3d-ac23-e7ac0f0eb8df
+                    - cde4f7f9-5e09-4fd5-b148-416852018635
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5ef2efa3-6118-4218-9655-070c310d53fe:
+              id: 5ef2efa3-6118-4218-9655-070c310d53fe
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfAndSourceProfiles
+              label: VRF and Source Profiles
+              description: Configure a profile to enable VRFs for SNMP and the Source interface to use
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: dc844dd1-8344-4a36-9797-815451dc698d
+                key: 93e62c86-32d0-45c1-92bf-d8321be9b980
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            19f3efe2-d9e3-4a10-8714-07c7dc044787:
+              id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
+              type: INPUT_FIELD_TYPE_GROUP
+              name: aclGroup
+              label: ACL Group
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 56280cfb-2dc1-43e4-9edf-20efd514f2b8
+                    - 324c2c71-1a9f-4700-93ee-be3079b0132c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f2b76f49-0887-4026-94d6-ab3c7a5413b3:
+              id: f2b76f49-0887-4026-94d6-ab3c7a5413b3
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpLocationContactProfiles
+              label: SNMP Location and Contact Profiles
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 2346c223-880d-4c08-b799-7b61fdb3f45c
+                key: 7cca9d7b-ceef-43c9-ab29-f4bdd03fa633
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c7128d40-9539-4570-99da-8dfd2d1738af:
+              id: c7128d40-9539-4570-99da-8dfd2d1738af
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableSnmpTraps
+              label: Enable SNMP Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7ba095b8-f206-462a-9e79-97b70d71101c:
+              id: 7ba095b8-f206-462a-9e79-97b70d71101c
+              type: INPUT_FIELD_TYPE_STRING
+              name: eosCli
+              label: EOS CLI
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            93e62c86-32d0-45c1-92bf-d8321be9b980:
+              id: 93e62c86-32d0-45c1-92bf-d8321be9b980
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfProfileName
               label: Profile Name
               description: ''
               required: false
@@ -530,12 +592,39 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            e43b1da5-fa92-4701-b250-cbfe991fe4c1:
-              id: e43b1da5-fa92-4701-b250-cbfe991fe4c1
+            e0ce1e38-a504-4ff2-8b28-3581cd8e2174:
+              id: e0ce1e38-a504-4ff2-8b28-3581cd8e2174
               type: INPUT_FIELD_TYPE_STRING
-              name: snmpLocationContactProfile
-              label: SNMP Location and Contact Profile
-              description: ''
+              name: snmpCommunityMode
+              label: SNMP Community Mode
+              description: Read or Read-Write Community
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - ro
+                    - rw
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            44f78d39-f5a4-4aae-b68b-3194a61b7ef5:
+              id: 44f78d39-f5a4-4aae-b68b-3194a61b7ef5
+              type: INPUT_FIELD_TYPE_STRING
+              name: description
+              label: Description
+              description: Remark Description
               required: false
               boolean_props: null
               integer_props: null
@@ -543,9 +632,7 @@
               string_props:
                 default_value: null
                 static_options: null
-                dynamic_options:
-                  values:
-                    - '{"fieldId":"7cca9d7b-ceef-43c9-ab29-f4bdd03fa633"}'
+                dynamic_options: null
                 length: null
                 pattern: null
                 format: null
@@ -580,235 +667,11 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            22373911-34f2-4c53-9c9a-7bba8379ac30:
-              id: 22373911-34f2-4c53-9c9a-7bba8379ac30
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableIsIsTraps
-              label: Enable IS-IS Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            bd60058a-8a3d-43e2-9b22-c2862c53cc0f:
-              id: bd60058a-8a3d-43e2-9b22-c2862c53cc0f
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableClbTraps
-              label: Enable CLB Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            c092734d-2a3e-4b8a-8dee-9aa16abde7ec:
-              id: c092734d-2a3e-4b8a-8dee-9aa16abde7ec
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableOspfTraps
-              label: Enable OSPF Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            6120a2cb-96ec-4180-939c-53637e390644:
-              id: 6120a2cb-96ec-4180-939c-53637e390644
+            d5e87ff2-921b-400c-9e0e-104f51a0f8f5:
+              id: d5e87ff2-921b-400c-9e0e-104f51a0f8f5
               type: INPUT_FIELD_TYPE_STRING
-              name: permitDenyRemark
-              label: Permit Deny Remark
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options:
-                  values:
-                    - permit
-                    - deny
-                    - remark
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            3e09430d-5fa1-45af-860a-e425a8e14c58:
-              id: 3e09430d-5fa1-45af-860a-e425a8e14c58
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: seqNumber
-              label: Seq Number
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: null
-                dynamic_options: null
-                extra_values_allowed: false
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            1b34d20a-668c-4c5a-a101-28c79b20caed:
-              id: 1b34d20a-668c-4c5a-a101-28c79b20caed
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: SNMP Trap Profiles Group
-              description: Group of members for SNMP Trap Profiles
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 3f04d942-deda-48d3-a6aa-72f7c1c14b20
-                    - 211a69e5-b135-4e29-bec3-8d0d547f403b
-                    - 51f666f6-dd04-4c57-9ad9-476e1e04597b
-                    - 3aa99096-90fa-4a41-bfbe-eb093def8e51
-                    - bd60058a-8a3d-43e2-9b22-c2862c53cc0f
-                    - a3d64274-eeb1-41c2-944c-0e2c17a0a19b
-                    - 656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f
-                    - 22373911-34f2-4c53-9c9a-7bba8379ac30
-                    - 5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae
-                    - 23bd8dbc-5937-4918-88fb-9b53c6cfc878
-                    - c092734d-2a3e-4b8a-8dee-9aa16abde7ec
-                    - c37f5557-9a45-4809-be59-d0e36c694ed8
-                    - f24b3308-f919-4216-90e1-773cf4ce6afa
-                    - c7128d40-9539-4570-99da-8dfd2d1738af
-                    - 940b8968-b391-4c7f-8afc-d69a032655e9
-                    - 652e7eb8-c02c-4af2-b05e-00f35d526344
-                    - 0e53c95c-a081-4b54-b2a7-9822a840c3ca
-                    - d1390f77-b6cf-47a3-b7a7-ec24be30c421
-                    - 7ba095b8-f206-462a-9e79-97b70d71101c
-                    - 634a7ea2-8985-48dc-a938-d644cd0eec41
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            55e4425e-e5da-4d1b-89e2-f155d136eb81:
-              id: 55e4425e-e5da-4d1b-89e2-f155d136eb81
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpTrapHostProfiles
-              label: SNMP Trap Host Profiles
-              description: Create a profile containing SNMP Trap Settings.  These can then be assigned to devices.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51
-                key: aaeddc78-386e-4625-9795-f2b68e7fe6f3
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            cde4f7f9-5e09-4fd5-b148-416852018635:
-              id: cde4f7f9-5e09-4fd5-b148-416852018635
-              type: INPUT_FIELD_TYPE_STRING
-              name: eosCli
-              label: EOS CLI
-              description: Enter EOS CLI Commands here that are not handled by this profile.  These CLI commands will override studio-generated commands if there is a conflict.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            19f3efe2-d9e3-4a10-8714-07c7dc044787:
-              id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
-              type: INPUT_FIELD_TYPE_GROUP
-              name: aclGroup
-              label: ACL Group
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 56280cfb-2dc1-43e4-9edf-20efd514f2b8
-                    - 324c2c71-1a9f-4700-93ee-be3079b0132c
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            44f78d39-f5a4-4aae-b68b-3194a61b7ef5:
-              id: 44f78d39-f5a4-4aae-b68b-3194a61b7ef5
-              type: INPUT_FIELD_TYPE_STRING
-              name: description
-              label: Description
-              description: Remark Description
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            cd3db0b3-4098-4451-89e2-e1cae8e4e4b6:
-              id: cd3db0b3-4098-4451-89e2-e1cae8e4e4b6
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpTrapHostProfile
-              label: SNMP Trap Host Profile
+              name: snmpCommunityProfile
+              label: SNMP Community Profile
               description: ''
               required: false
               boolean_props: null
@@ -819,162 +682,7 @@
                 static_options: null
                 dynamic_options:
                   values:
-                    - '{"fieldId":"aaeddc78-386e-4625-9795-f2b68e7fe6f3"}'
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            dc844dd1-8344-4a36-9797-815451dc698d:
-              id: dc844dd1-8344-4a36-9797-815451dc698d
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: VRF and Source Profiles Group
-              description: Group of members for VRF and Source Profile
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 93e62c86-32d0-45c1-92bf-d8321be9b980
-                    - 27436b22-f26e-4015-99d2-e2d648b52606
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            1793d6ac-9ed7-49d4-893a-7d7935c3ac2b:
-              id: 1793d6ac-9ed7-49d4-893a-7d7935c3ac2b
-              type: INPUT_FIELD_TYPE_STRING
-              name: eosCli
-              label: EOS CLI
-              description: Additional CLI Commands.  These commands will override studio-generated commands if there is s conflict.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            root:
-              id: root
-              type: INPUT_FIELD_TYPE_GROUP
-              name: ''
-              label: ''
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - a407012c-abe1-45f3-8cd7-fae0b8ba9cfb
-                    - f2b76f49-0887-4026-94d6-ab3c7a5413b3
-                    - 55e4425e-e5da-4d1b-89e2-f155d136eb81
-                    - ff662aaa-f1bf-44e5-9b86-52570312c106
-                    - 5ef2efa3-6118-4218-9655-070c310d53fe
-                    - 43e2aa39-7b4d-446a-a8e4-12a6ec5ca84a
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: null
-              tag_matcher_props: null
-            656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f:
-              id: 656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableExternalAlarmTraps
-              label: Enable External Alarm Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            c7128d40-9539-4570-99da-8dfd2d1738af:
-              id: c7128d40-9539-4570-99da-8dfd2d1738af
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableSnmpTraps
-              label: Enable SNMP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            e0ce1e38-a504-4ff2-8b28-3581cd8e2174:
-              id: e0ce1e38-a504-4ff2-8b28-3581cd8e2174
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpCommunityMode
-              label: SNMP Community Mode
-              description: Read or Read-Write Community
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options:
-                  values:
-                    - ro
-                    - rw
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d:
-              id: 4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d
-              type: INPUT_FIELD_TYPE_STRING
-              name: vrfSourceProfile
-              label: VRF Source Profile
-              description: Assign a VRF and Source Interface Profile to the group of devices.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options:
-                  values:
-                    - '{"fieldId":"93e62c86-32d0-45c1-92bf-d8321be9b980"}'
+                    - '{"fieldId":"a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8"}'
                 length: null
                 pattern: null
                 format: null
@@ -1006,195 +714,11 @@
                 tag_filter_query: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            634a7ea2-8985-48dc-a938-d644cd0eec41:
-              id: 634a7ea2-8985-48dc-a938-d644cd0eec41
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableLldpTraps
-              label: Enable LLDP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            51f666f6-dd04-4c57-9ad9-476e1e04597b:
-              id: 51f666f6-dd04-4c57-9ad9-476e1e04597b
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableBridgeTraps
-              label: Enable Bridge Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            d1390f77-b6cf-47a3-b7a7-ec24be30c421:
-              id: d1390f77-b6cf-47a3-b7a7-ec24be30c421
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableVrrpTraps
-              label: Enable VRRP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51:
-              id: a3aa7c8f-8f07-4d07-8f9f-2c2ae34def51
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: SNMP Trap Host Profiles Group
-              description: Group of members for SNMP Trap Host Profiles
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - aaeddc78-386e-4625-9795-f2b68e7fe6f3
-                    - bdfe530e-4738-4b3d-ac23-e7ac0f0eb8df
-                    - cde4f7f9-5e09-4fd5-b148-416852018635
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            d5e87ff2-921b-400c-9e0e-104f51a0f8f5:
-              id: d5e87ff2-921b-400c-9e0e-104f51a0f8f5
+            b4b06667-e063-435a-8b27-e541cd8d321d:
+              id: b4b06667-e063-435a-8b27-e541cd8d321d
               type: INPUT_FIELD_TYPE_STRING
-              name: snmpCommunityProfile
-              label: SNMP Community Profile
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options:
-                  values:
-                    - '{"fieldId":"a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8"}'
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            23bd8dbc-5937-4918-88fb-9b53c6cfc878:
-              id: 23bd8dbc-5937-4918-88fb-9b53c6cfc878
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableMsdpTraps
-              label: Enable MSDP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae:
-              id: 5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableMplsLdpTraps
-              label: Enable MPLS-LDP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            1cf85186-10e4-41cd-a640-ac0a2ace29e6:
-              id: 1cf85186-10e4-41cd-a640-ac0a2ace29e6
-              type: INPUT_FIELD_TYPE_STRING
-              name: vrf
-              label: VRF
-              description: Configure the VRF used to contact the SNMP Trap host, if needed.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca:
-              id: 0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpTrapVersion
-              label: SNMP Trap Version
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options:
-                  values:
-                    - '1'
-                    - '2'
-                    - 2c
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            36dec517-bb55-46c9-8894-7c677cf7d1e3:
-              id: 36dec517-bb55-46c9-8894-7c677cf7d1e3
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpCommunity
-              label: SNMP Community
+              name: snmpLocation
+              label: SNMP Location
               description: ''
               required: false
               boolean_props: null
@@ -1209,41 +733,6 @@
                 format: null
                 is_secret: false
                 extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            324c2c71-1a9f-4700-93ee-be3079b0132c:
-              id: 324c2c71-1a9f-4700-93ee-be3079b0132c
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: aclLines
-              label: ACL Lines
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d
-                key: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a3d64274-eeb1-41c2-944c-0e2c17a0a19b:
-              id: a3d64274-eeb1-41c2-944c-0e2c17a0a19b
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableEntityTraps
-              label: Enable Entity Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
               group_props: null
               collection_props: null
               resolver_props: null
@@ -1290,10 +779,34 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            93e62c86-32d0-45c1-92bf-d8321be9b980:
-              id: 93e62c86-32d0-45c1-92bf-d8321be9b980
+            cde4f7f9-5e09-4fd5-b148-416852018635:
+              id: cde4f7f9-5e09-4fd5-b148-416852018635
               type: INPUT_FIELD_TYPE_STRING
-              name: vrfProfileName
+              name: eosCli
+              label: EOS CLI
+              description: Enter EOS CLI Commands here that are not handled by this profile.  These CLI commands will override studio-generated commands if there is a conflict.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8:
+              id: a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
               label: Profile Name
               description: ''
               required: false
@@ -1314,12 +827,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            020dc026-e59f-4656-a3c9-eec998727f79:
-              id: 020dc026-e59f-4656-a3c9-eec998727f79
+            edf5afd0-7d58-4f78-a0b3-889ab7eeb112:
+              id: edf5afd0-7d58-4f78-a0b3-889ab7eeb112
               type: INPUT_FIELD_TYPE_STRING
-              name: snmpCommunityAcl
-              label: SNMP Community ACL
-              description: Limit access to the community with an ACL
+              name: snmpTrapProfile
+              label: SNMP Trap Profile
+              description: ''
               required: false
               boolean_props: null
               integer_props: null
@@ -1329,22 +842,57 @@
                 static_options: null
                 dynamic_options:
                   values:
-                    - '{"fieldId":"56280cfb-2dc1-43e4-9edf-20efd514f2b8"}'
+                    - '{"fieldId":"3f04d942-deda-48d3-a6aa-72f7c1c14b20"}'
                 length: null
                 pattern: null
                 format: null
                 is_secret: false
-                extra_values_allowed: true
+                extra_values_allowed: false
               group_props: null
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            652e7eb8-c02c-4af2-b05e-00f35d526344:
-              id: 652e7eb8-c02c-4af2-b05e-00f35d526344
+            a3d64274-eeb1-41c2-944c-0e2c17a0a19b:
+              id: a3d64274-eeb1-41c2-944c-0e2c17a0a19b
               type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableSwitchoverTraps
-              label: Enable Switchover Traps
+              name: enableEntityTraps
+              label: Enable Entity Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ff662aaa-f1bf-44e5-9b86-52570312c106:
+              id: ff662aaa-f1bf-44e5-9b86-52570312c106
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpTrapProfiles
+              label: SNMP Trap Profiles
+              description: Create profiles that enable traps to send to trap hosts.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 1b34d20a-668c-4c5a-a101-28c79b20caed
+                key: 3f04d942-deda-48d3-a6aa-72f7c1c14b20
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            634a7ea2-8985-48dc-a938-d644cd0eec41:
+              id: 634a7ea2-8985-48dc-a938-d644cd0eec41
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableLldpTraps
+              label: Enable LLDP Traps
               description: ''
               required: false
               boolean_props:
@@ -1381,12 +929,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            bc72a257-5596-450f-bd33-f3c03de6b7f6:
-              id: bc72a257-5596-450f-bd33-f3c03de6b7f6
+            2618bc97-c779-44a8-a25b-8f0e7af8a22a:
+              id: 2618bc97-c779-44a8-a25b-8f0e7af8a22a
               type: INPUT_FIELD_TYPE_GROUP
               name: value
-              label: SNMP Trap Hosts Group
-              description: Group of members for SNMP Trap Hosts
+              label: VRF Profiles Group
+              description: Group of members for VRF Profiles
               required: false
               boolean_props: null
               integer_props: null
@@ -1395,125 +943,61 @@
               group_props:
                 members:
                   values:
-                    - d64cc020-7563-4803-a247-0da400033dd1
-                    - 0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca
-                    - c5a2ea14-8fc3-4b5c-bb22-e1722c8fd498
-                    - f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
-                    - 1cf85186-10e4-41cd-a640-ac0a2ace29e6
-                    - 129da7a1-e3a0-4b9b-8638-c549459d5d08
-                    - 3f2e2168-a151-41af-ba33-1f31050f8b14
-                    - b860a660-7f10-45ab-91fc-49925d9d2da3
+                    - 991a531d-10b5-44d1-8ba7-ac3755b862b4
+                    - 9868c529-38ba-477f-8f8b-be318c4b90c6
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            b860a660-7f10-45ab-91fc-49925d9d2da3:
-              id: b860a660-7f10-45ab-91fc-49925d9d2da3
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: refreshDNS
-              label: RefreshDNS
-              description: Periodically refresh DNS Resolution
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            5ef2efa3-6118-4218-9655-070c310d53fe:
-              id: 5ef2efa3-6118-4218-9655-070c310d53fe
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: vrfAndSourceProfiles
-              label: VRF and Source Profiles
-              description: Configure a profile to enable VRFs for SNMP and the Source interface to use
+            3e09430d-5fa1-45af-860a-e425a8e14c58:
+              id: 3e09430d-5fa1-45af-860a-e425a8e14c58
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: seqNumber
+              label: Seq Number
+              description: ''
               required: false
               boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: dc844dd1-8344-4a36-9797-815451dc698d
-                key: 93e62c86-32d0-45c1-92bf-d8321be9b980
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            b3f4ce96-df42-4afb-8998-bf20d8530b90:
-              id: b3f4ce96-df42-4afb-8998-bf20d8530b90
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: SNMP Community Profiles Group
-              description: Group of members for SNMP Community Profiles
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
-                    - d0128a22-e361-4ed9-9f5e-f09f3da55ab3
-                    - a2ad4c9d-3787-4613-ae8e-87e2d100785b
-                    - 1793d6ac-9ed7-49d4-893a-7d7935c3ac2b
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            b313c4c5-f2b1-4874-b124-0976c09ff27b:
-              id: b313c4c5-f2b1-4874-b124-0976c09ff27b
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: SNMP Communities Group
-              description: Group of members for SNMP Communities
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 36dec517-bb55-46c9-8894-7c677cf7d1e3
-                    - e0ce1e38-a504-4ff2-8b28-3581cd8e2174
-                    - 020dc026-e59f-4656-a3c9-eec998727f79
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            77e2d392-c39c-4df3-9b91-c6b674c3631c:
-              id: 77e2d392-c39c-4df3-9b91-c6b674c3631c
-              type: INPUT_FIELD_TYPE_STRING
-              name: sourceIP
-              label: Source
-              description: Source IP/Network.  If a network, can be input in CIDR notation or use the Wildcard mask field.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
+              integer_props:
                 default_value: null
                 static_options: null
+                range: null
                 dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
                 extra_values_allowed: false
+              float_props: null
+              string_props: null
               group_props: null
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            7ba095b8-f206-462a-9e79-97b70d71101c:
-              id: 7ba095b8-f206-462a-9e79-97b70d71101c
+            65c2a79c-c370-45c1-8c3e-c2494f0b8c19:
+              id: 65c2a79c-c370-45c1-8c3e-c2494f0b8c19
+              type: INPUT_FIELD_TYPE_GROUP
+              name: snmpProfileGroup
+              label: SNMP Profile Assignment Group
+              description: Group of members for SNMP Profile Assignment
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - d5e87ff2-921b-400c-9e0e-104f51a0f8f5
+                    - e43b1da5-fa92-4701-b250-cbfe991fe4c1
+                    - cd3db0b3-4098-4451-89e2-e1cae8e4e4b6
+                    - edf5afd0-7d58-4f78-a0b3-889ab7eeb112
+                    - 4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            36dec517-bb55-46c9-8894-7c677cf7d1e3:
+              id: 36dec517-bb55-46c9-8894-7c677cf7d1e3
               type: INPUT_FIELD_TYPE_STRING
-              name: eosCli
-              label: EOS CLI
+              name: snmpCommunity
+              label: SNMP Community
               description: ''
               required: false
               boolean_props: null
@@ -1533,22 +1017,207 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            f7cf96f2-c563-4bd4-b5b1-5b391b7bb381:
-              id: f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: snmpTrapPort
-              label: SNMP Trap Port
-              description: The UDP Port to send the Trap on if different than 162
+            a2ad4c9d-3787-4613-ae8e-87e2d100785b:
+              id: a2ad4c9d-3787-4613-ae8e-87e2d100785b
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: snmpAcls
+              label: SNMP ACLs
+              description: Create Standard IP ACLs to use with Communities
               required: false
               boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: null
-                dynamic_options: null
-                extra_values_allowed: false
+              integer_props: null
               float_props: null
               string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 19f3efe2-d9e3-4a10-8714-07c7dc044787
+                key: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3f2e2168-a151-41af-ba33-1f31050f8b14:
+              id: 3f2e2168-a151-41af-ba33-1f31050f8b14
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableInforms
+              label: enableInforms
+              description: Use SNMP Inform messages
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1b34d20a-668c-4c5a-a101-28c79b20caed:
+              id: 1b34d20a-668c-4c5a-a101-28c79b20caed
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: SNMP Trap Profiles Group
+              description: Group of members for SNMP Trap Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 3f04d942-deda-48d3-a6aa-72f7c1c14b20
+                    - 211a69e5-b135-4e29-bec3-8d0d547f403b
+                    - 51f666f6-dd04-4c57-9ad9-476e1e04597b
+                    - 3aa99096-90fa-4a41-bfbe-eb093def8e51
+                    - bd60058a-8a3d-43e2-9b22-c2862c53cc0f
+                    - a3d64274-eeb1-41c2-944c-0e2c17a0a19b
+                    - 656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f
+                    - 22373911-34f2-4c53-9c9a-7bba8379ac30
+                    - 5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae
+                    - 23bd8dbc-5937-4918-88fb-9b53c6cfc878
+                    - c092734d-2a3e-4b8a-8dee-9aa16abde7ec
+                    - c37f5557-9a45-4809-be59-d0e36c694ed8
+                    - f24b3308-f919-4216-90e1-773cf4ce6afa
+                    - c7128d40-9539-4570-99da-8dfd2d1738af
+                    - 940b8968-b391-4c7f-8afc-d69a032655e9
+                    - 652e7eb8-c02c-4af2-b05e-00f35d526344
+                    - 0e53c95c-a081-4b54-b2a7-9822a840c3ca
+                    - d1390f77-b6cf-47a3-b7a7-ec24be30c421
+                    - 7ba095b8-f206-462a-9e79-97b70d71101c
+                    - 634a7ea2-8985-48dc-a938-d644cd0eec41
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c37f5557-9a45-4809-be59-d0e36c694ed8:
+              id: c37f5557-9a45-4809-be59-d0e36c694ed8
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableOspFv3Traps
+              label: Enable OSPFv3 Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            211a69e5-b135-4e29-bec3-8d0d547f403b:
+              id: 211a69e5-b135-4e29-bec3-8d0d547f403b
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableBgpTraps
+              label: Enable BGP Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f24b3308-f919-4216-90e1-773cf4ce6afa:
+              id: f24b3308-f919-4216-90e1-773cf4ce6afa
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enablePimTraps
+              label: Enable PIM Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            aaeddc78-386e-4625-9795-f2b68e7fe6f3:
+              id: aaeddc78-386e-4625-9795-f2b68e7fe6f3
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
+              label: Profile Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae:
+              id: 5f6af2cf-ba7a-4cb6-9de9-bc57daaa79ae
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableMplsLdpTraps
+              label: Enable MPLS-LDP Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c092734d-2a3e-4b8a-8dee-9aa16abde7ec:
+              id: c092734d-2a3e-4b8a-8dee-9aa16abde7ec
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableOspfTraps
+              label: Enable OSPF Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            1cf85186-10e4-41cd-a640-ac0a2ace29e6:
+              id: 1cf85186-10e4-41cd-a640-ac0a2ace29e6
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: Configure the VRF used to contact the SNMP Trap host, if needed.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
               group_props: null
               collection_props: null
               resolver_props: null
@@ -1596,30 +1265,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            27436b22-f26e-4015-99d2-e2d648b52606:
-              id: 27436b22-f26e-4015-99d2-e2d648b52606
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: vrfProfiles
-              label: VRF Profiles
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 2618bc97-c779-44a8-a25b-8f0e7af8a22a
-                key: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            85838f5c-46cf-43a0-b4d0-dce1638df6b9:
-              id: 85838f5c-46cf-43a0-b4d0-dce1638df6b9
+            77e2d392-c39c-4df3-9b91-c6b674c3631c:
+              id: 77e2d392-c39c-4df3-9b91-c6b674c3631c
               type: INPUT_FIELD_TYPE_STRING
-              name: wildcardMask
-              label: Wildcard Mask
-              description: Wildcard mask if source is a network address and was not input in CIDR notation
+              name: sourceIP
+              label: Source
+              description: Source IP/Network.  If a network, can be input in CIDR notation or use the Wildcard mask field.
               required: false
               boolean_props: null
               integer_props: null
@@ -1634,6 +1285,262 @@
                 is_secret: false
                 extra_values_allowed: false
               group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0730fb63-ad5d-4079-99b4-b39bf9e55ec9:
+              id: 0730fb63-ad5d-4079-99b4-b39bf9e55ec9
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: anySource
+              label: Any Source
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d:
+              id: 4b4d6aa2-50e3-48ab-9bae-61a1cf2ba06d
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfSourceProfile
+              label: VRF Source Profile
+              description: Assign a VRF and Source Interface Profile to the group of devices.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"93e62c86-32d0-45c1-92bf-d8321be9b980"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f:
+              id: 656b5a1a-4fb6-4939-8a6e-cd826aa1aa4f
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableExternalAlarmTraps
+              label: Enable External Alarm Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            22373911-34f2-4c53-9c9a-7bba8379ac30:
+              id: 22373911-34f2-4c53-9c9a-7bba8379ac30
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableIsIsTraps
+              label: Enable IS-IS Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b860a660-7f10-45ab-91fc-49925d9d2da3:
+              id: b860a660-7f10-45ab-91fc-49925d9d2da3
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: refreshDNS
+              label: RefreshDNS
+              description: Periodically refresh DNS Resolution
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b3f4ce96-df42-4afb-8998-bf20d8530b90:
+              id: b3f4ce96-df42-4afb-8998-bf20d8530b90
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: SNMP Community Profiles Group
+              description: Group of members for SNMP Community Profiles
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
+                    - d0128a22-e361-4ed9-9f5e-f09f3da55ab3
+                    - a2ad4c9d-3787-4613-ae8e-87e2d100785b
+                    - 1793d6ac-9ed7-49d4-893a-7d7935c3ac2b
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6120a2cb-96ec-4180-939c-53637e390644:
+              id: 6120a2cb-96ec-4180-939c-53637e390644
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDenyRemark
+              label: Permit Deny Remark
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                    - remark
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            cd3db0b3-4098-4451-89e2-e1cae8e4e4b6:
+              id: cd3db0b3-4098-4451-89e2-e1cae8e4e4b6
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapHostProfile
+              label: SNMP Trap Host Profile
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"aaeddc78-386e-4625-9795-f2b68e7fe6f3"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            652e7eb8-c02c-4af2-b05e-00f35d526344:
+              id: 652e7eb8-c02c-4af2-b05e-00f35d526344
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableSwitchoverTraps
+              label: Enable Switchover Traps
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca:
+              id: 0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca
+              type: INPUT_FIELD_TYPE_STRING
+              name: snmpTrapVersion
+              label: SNMP Trap Version
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - '1'
+                    - '2'
+                    - 2c
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            dc844dd1-8344-4a36-9797-815451dc698d:
+              id: dc844dd1-8344-4a36-9797-815451dc698d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: VRF and Source Profiles Group
+              description: Group of members for VRF and Source Profile
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 93e62c86-32d0-45c1-92bf-d8321be9b980
+                    - 27436b22-f26e-4015-99d2-e2d648b52606
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b313c4c5-f2b1-4874-b124-0976c09ff27b:
+              id: b313c4c5-f2b1-4874-b124-0976c09ff27b
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: SNMP Communities Group
+              description: Group of members for SNMP Communities
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 36dec517-bb55-46c9-8894-7c677cf7d1e3
+                    - e0ce1e38-a504-4ff2-8b28-3581cd8e2174
+                    - 020dc026-e59f-4656-a3c9-eec998727f79
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
@@ -1655,12 +1562,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            a407012c-abe1-45f3-8cd7-fae0b8ba9cfb:
-              id: a407012c-abe1-45f3-8cd7-fae0b8ba9cfb
+            27436b22-f26e-4015-99d2-e2d648b52606:
+              id: 27436b22-f26e-4015-99d2-e2d648b52606
               type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpCommunityProfiles
-              label: SNMP Community Profiles
-              description: Create Profiles containing SNMP Communities and Standard ACLs.  These Profiles can then be assigned to device(s).
+              name: vrfProfiles
+              label: VRF Profiles
+              description: ''
               required: false
               boolean_props: null
               integer_props: null
@@ -1668,16 +1575,34 @@
               string_props: null
               group_props: null
               collection_props:
-                base_field_id: b3f4ce96-df42-4afb-8998-bf20d8530b90
-                key: a8bc51d2-dde8-4f06-8c6e-fa5b8e90e8b8
+                base_field_id: 2618bc97-c779-44a8-a25b-8f0e7af8a22a
+                key: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            aaeddc78-386e-4625-9795-f2b68e7fe6f3:
-              id: aaeddc78-386e-4625-9795-f2b68e7fe6f3
+            324c2c71-1a9f-4700-93ee-be3079b0132c:
+              id: 324c2c71-1a9f-4700-93ee-be3079b0132c
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: aclLines
+              label: ACL Lines
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: e0e7ae66-45f9-4f8b-b1a9-e24ea405c51d
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            56280cfb-2dc1-43e4-9edf-20efd514f2b8:
+              id: 56280cfb-2dc1-43e4-9edf-20efd514f2b8
               type: INPUT_FIELD_TYPE_STRING
-              name: profileName
-              label: Profile Name
+              name: aclName
+              label: ACL Name
               description: ''
               required: false
               boolean_props: null
@@ -1718,87 +1643,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            940b8968-b391-4c7f-8afc-d69a032655e9:
-              id: 940b8968-b391-4c7f-8afc-d69a032655e9
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableSnmpConfigManEventTraps
-              label: Enable snmpConfigManEvent Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            f24b3308-f919-4216-90e1-773cf4ce6afa:
-              id: f24b3308-f919-4216-90e1-773cf4ce6afa
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enablePimTraps
-              label: Enable PIM Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            211a69e5-b135-4e29-bec3-8d0d547f403b:
-              id: 211a69e5-b135-4e29-bec3-8d0d547f403b
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableBgpTraps
-              label: Enable BGP Traps
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            9868c529-38ba-477f-8f8b-be318c4b90c6:
-              id: 9868c529-38ba-477f-8f8b-be318c4b90c6
-              type: INPUT_FIELD_TYPE_STRING
-              name: localInterface
-              label: Local Interface
-              description: The Source Interface to use for SNMP Traps
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            2618bc97-c779-44a8-a25b-8f0e7af8a22a:
-              id: 2618bc97-c779-44a8-a25b-8f0e7af8a22a
+            bc72a257-5596-450f-bd33-f3c03de6b7f6:
+              id: bc72a257-5596-450f-bd33-f3c03de6b7f6
               type: INPUT_FIELD_TYPE_GROUP
               name: value
-              label: VRF Profiles Group
-              description: Group of members for VRF Profiles
+              label: SNMP Trap Hosts Group
+              description: Group of members for SNMP Trap Hosts
               required: false
               boolean_props: null
               integer_props: null
@@ -1807,67 +1657,14 @@
               group_props:
                 members:
                   values:
-                    - 991a531d-10b5-44d1-8ba7-ac3755b862b4
-                    - 9868c529-38ba-477f-8f8b-be318c4b90c6
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            d0128a22-e361-4ed9-9f5e-f09f3da55ab3:
-              id: d0128a22-e361-4ed9-9f5e-f09f3da55ab3
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: snmpCommunities
-              label: SNMP Communities
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: b313c4c5-f2b1-4874-b124-0976c09ff27b
-                key: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            0730fb63-ad5d-4079-99b4-b39bf9e55ec9:
-              id: 0730fb63-ad5d-4079-99b4-b39bf9e55ec9
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: anySource
-              label: Any Source
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            f1d71f56-f244-41b7-9801-eaf0894440a2:
-              id: f1d71f56-f244-41b7-9801-eaf0894440a2
-              type: INPUT_FIELD_TYPE_STRING
-              name: snmpContact
-              label: SNMP Contact
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
+                    - d64cc020-7563-4803-a247-0da400033dd1
+                    - 0d0cc8a5-0d57-4bf5-9a66-0aa1526f01ca
+                    - c5a2ea14-8fc3-4b5c-bb22-e1722c8fd498
+                    - f7cf96f2-c563-4bd4-b5b1-5b391b7bb381
+                    - 1cf85186-10e4-41cd-a640-ac0a2ace29e6
+                    - 129da7a1-e3a0-4b9b-8638-c549459d5d08
+                    - 3f2e2168-a151-41af-ba33-1f31050f8b14
+                    - b860a660-7f10-45ab-91fc-49925d9d2da3
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
