@@ -7,225 +7,136 @@
         workspace_id: ''
       created_at: '2025-08-05T13:48:06.381Z'
       created_by: mschulman
-      last_modified_at: '2025-08-05T16:26:42.460Z'
+      last_modified_at: '2025-08-08T13:30:32.988Z'
       last_modified_by: mschulman
       display_name: Management Protocols
       description: Configure Telnet, SSH, and API settings
       template:
         type: TEMPLATE_TYPE_MAKO
-        body: |-
-          % if profileAssignmentResolver:
-              <% profileGroup = profileAssignmentResolver.resolve()["profileAssignmentGroup"] %>
-              <% ctx.info(f"profileGroup: {profileGroup}") %>
-
-              <%
-                  mgmtProfileList = [ profile for profile in managementProtocolProfiles if profile.get("profileName") == profileGroup["profileName"] ]
-                  if mgmtProfileList:
-                          mgmtProfile = mgmtProfileList[0]
-                          ctx.info(f"mgmtProfile: {mgmtProfileList[0]}")
-                  endif
-
-              %>
-
-              % if mgmtProfileList:
-                  % if mgmtProfile['mgmtProtocolAcLs']:
-                      % for acl in mgmtProfile['mgmtProtocolAcLs']:
-          ip access-list standard ${acl.aclName}
-                          % for aclLine in acl.aclLines:
-                              % if aclLine.permitDenyRemark != "remark":
-                                  % if aclLine.anySource:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any
-                                      % endif
-                                  % elif aclLine.isHost:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP} log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP}
-                                      % endif
-                                  % else:
-                                      % if aclLine.log:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask} log
-                                      % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask}
-                                      % endif
-                                  % endif
-                              % else:
-           ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.description} 
-                              % endif
-                          % endfor
-                      % endfor 
-                  % endif   
-
-                  % if mgmtProfile.telnetConfiguration.enableTelnetAccess:
-          management telnet
-            no shutdown
-                      % if mgmtProfile.telnetConfiguration.accessGroup:
-           ip access-group ${mgmtProfile.telnetConfiguration.accessGroup} in
-                      % endif
-                      % if mgmtProfile.telnetConfiguration.idleTimeout:
-           idle-timeout ${mgmtProfile.telnetConfiguration.idleTimeout}
-                      % endif
-                      % if mgmtProfile.telnetConfiguration.sessionLimit:
-           session-limit ${mgmtProfile.telnetConfiguration.sessionLimit}
-                      % endif
-                      % if mgmtProfile.telnetConfiguration.sessionLimitPerHost:
-           session-limit per-host ${mgmtProfile.telnetConfiguration.sessionLimitPerHost}
-                      % endif
-                  % else:
-          management telnet
-            shutdown
-                  % endif
-                  % if mgmtProfile.telnetConfiguration.vrfConfigs:
-          management telnet
-                      % for vrf in mgmtProfile.telnetConfiguration.vrfConfigs:
-           vrf ${vrf.vrfName}
-                          % if vrf.enableTelnet:
-             no shutdown
-                          % else:
-             shutdown
-                          % endif
-                      % endfor
-                  % endif
-
-                  % if mgmtProfile.sshConfiguration.enableSshAccess:
-          management ssh
-           no shutdown
-                      % if mgmtProfile.sshConfiguration.accessGroup:
-           ip access-group ${mgmtProfile.sshConfiguration.accessGroup} in
-                      % endif
-                      % if mgmtProfile.sshConfiguration.idleTimeout:
-           idle-timeout ${mgmtProfile.sshConfiguration.idleTimeout}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.connectionLimit:
-           connection limit ${mgmtProfile.sshConfiguration.connectionLimit}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.connectionLimitPerHost:
-           connection per-host ${mgmtProfile.sshConfiguration.connectionLimitPerHost}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.loginTimeout:
-           login timeout ${mgmtProfile.sshConfiguration.loginTimeout}
-                      % endif
-                  % else:
-          management ssh
-           shutdown
-                      % if mgmtProfile.sshConfiguration.accessGroup:
-           ip access-group ${mgmtProfile.sshConfiguration.accessGroup} in
-                      % endif
-                      % if mgmtProfile.sshConfiguration.idleTimeout:
-           idle-timeout ${mgmtProfile.sshConfiguration.idleTimeout}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.connectionLimit:
-           connection limit ${mgmtProfile.sshConfiguration.connectionLimit}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.connectionLimitPerHost:
-           connection per-host ${mgmtProfile.sshConfiguration.connectionLimitPerHost}
-                      % endif
-                      % if mgmtProfile.sshConfiguration.loginTimeout:
-           login timeout ${mgmtProfile.sshConfiguration.loginTimeout}
-                      % endif
-                  % endif
-                  % if mgmtProfile.sshConfiguration.vrfConfigs:
-          management ssh
-                      % for vrf in mgmtProfile.sshConfiguration.vrfConfigs:
-           vrf ${vrf.vrfName}
-                          % if vrf.enableSsh:
-             no shutdown
-                          % else:
-             shutdown
-                          % endif
-                      % endfor
-                  % endif
-
-                  % if mgmtProfile.consoleConfiguration.idleTimeout:
-          management console
-           idle-timeout ${mgmtProfile.consoleConfiguration.idleTimeout}
-                  % endif
-
-                  % if mgmtProfile.apiConfiguration.disableRestApi:
-          management api http-commands
-           shutdown
-                  % else:
-          management api http-commands
-           no shutdown
-                  % endif
-                  
-                  % if mgmtProfile.apiConfiguration.enableApiViaHttp:
-          management api http-commands
-            protocol http
-                  % else:
-          management api http-commands
-            no protocol http
-                  % endif
-
-                  % if mgmtProfile.apiConfiguration.enableApiViaHttps:
-          management api http-commands
-            protocol https
-                  % else:
-          management api http-commands
-            no protocol https
-                  % endif
-                  % if mgmtProfile.apiConfiguration.vrfConfigs:
-          management api http-commands
-                      % for vrf in mgmtProfile.apiConfiguration.vrfConfigs:
-           vrf ${vrf.vrfName}
-                          % if vrf.enableRestApi:
-             no shutdown
-                          % else:
-             shutdown
-                          % endif
-                      % endfor
-                  % endif
-                  ${mgmtProfile.get("eosCli")}
-              % endif     
-          % endif
+        body: "% if profileAssignmentResolver:\n    <% profileGroup = profileAssignmentResolver.resolve()[\"profileAssignmentGroup\"] %>\n    <% ctx.info(f\"profileGroup: {profileGroup}\") %>\n\n    <%\n        # Use a list comprehension to find the profile dictionary that has a key that matches the name of the profile assigned\n        # to the Resolver.  This will result in a list with one dictionary in it.\n\n        mgmtProfileList = [ profile for profile in managementProtocolProfiles if profile.get(\"profileName\") == profileGroup[\"profileName\"] ]\n        \n        # Create empty Profile dictionaries so that devices added to the studio but aren't matched to a Resolver\n\t    # will still have the variable created and not generate an error on studio build.\n        mgmtProfile = {}\n\n        # Because the profile list variable is a list, extract the first item in the list and assign to the profile variable.\n        if mgmtProfileList:\n                mgmtProfile = mgmtProfileList[0]\n                ctx.info(f\"mgmtProfile: {mgmtProfileList[0]}\")\n        endif\n\n    %>\n\n    % if mgmtProfile:\n        % if mgmtProfile['mgmtProtocolAcLs']:\n            % for acl in mgmtProfile['mgmtProtocolAcLs']:\nip access-list standard ${acl.aclName}\n                % for aclLine in acl.aclLines:\n                    % if aclLine.permitDenyRemark != \"remark\":\n                        % if aclLine.anySource:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} any\n                            % endif\n                        % elif aclLine.isHost:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP} log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} host ${aclLine.sourceIP}\n                            % endif\n                        % else:\n                            % if aclLine.log:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask} log\n                            % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.sourceIP} ${aclLine.wildcardMask}\n                            % endif\n                        % endif\n                    % else:\n ${aclLine.seqNumber} ${aclLine.permitDenyRemark} ${aclLine.description} \n                    % endif\n                % endfor\n            % endfor \n        % endif   \n\n        % if mgmtProfile.telnetConfiguration.enableTelnetAccess:\nmanagement telnet\n  no shutdown\n            % if mgmtProfile.telnetConfiguration.accessGroup:\n ip access-group ${mgmtProfile.telnetConfiguration.accessGroup} in\n            % endif\n            % if mgmtProfile.telnetConfiguration.idleTimeout:\n idle-timeout ${mgmtProfile.telnetConfiguration.idleTimeout}\n            % endif\n            % if mgmtProfile.telnetConfiguration.sessionLimit:\n session-limit ${mgmtProfile.telnetConfiguration.sessionLimit}\n            % endif\n            % if mgmtProfile.telnetConfiguration.sessionLimitPerHost:\n session-limit per-host ${mgmtProfile.telnetConfiguration.sessionLimitPerHost}\n            % endif\n        % else:\nmanagement telnet\n  shutdown\n        % endif\n        % if mgmtProfile.telnetConfiguration.vrfConfigs:\nmanagement telnet\n            % for vrf in mgmtProfile.telnetConfiguration.vrfConfigs:\n vrf ${vrf.vrfName}\n                % if vrf.enableTelnet:\n   no shutdown\n                % else:\n   shutdown\n                % endif\n            % endfor\n        % endif\n\n        % if mgmtProfile.sshConfiguration.enableSshAccess:\nmanagement ssh\n no shutdown\n            % if mgmtProfile.sshConfiguration.accessGroup:\n ip access-group ${mgmtProfile.sshConfiguration.accessGroup} in\n            % endif\n            % if mgmtProfile.sshConfiguration.idleTimeout:\n idle-timeout ${mgmtProfile.sshConfiguration.idleTimeout}\n            % endif\n            % if mgmtProfile.sshConfiguration.connectionLimit:\n connection limit ${mgmtProfile.sshConfiguration.connectionLimit}\n            % endif\n            % if mgmtProfile.sshConfiguration.connectionLimitPerHost:\n connection per-host ${mgmtProfile.sshConfiguration.connectionLimitPerHost}\n            % endif\n            % if mgmtProfile.sshConfiguration.loginTimeout:\n login timeout ${mgmtProfile.sshConfiguration.loginTimeout}\n            % endif\n        % else:\nmanagement ssh\n shutdown\n            % if mgmtProfile.sshConfiguration.accessGroup:\n ip access-group ${mgmtProfile.sshConfiguration.accessGroup} in\n            % endif\n            % if mgmtProfile.sshConfiguration.idleTimeout:\n idle-timeout ${mgmtProfile.sshConfiguration.idleTimeout}\n            % endif\n            % if mgmtProfile.sshConfiguration.connectionLimit:\n connection limit ${mgmtProfile.sshConfiguration.connectionLimit}\n            % endif\n            % if mgmtProfile.sshConfiguration.connectionLimitPerHost:\n connection per-host ${mgmtProfile.sshConfiguration.connectionLimitPerHost}\n            % endif\n            % if mgmtProfile.sshConfiguration.loginTimeout:\n login timeout ${mgmtProfile.sshConfiguration.loginTimeout}\n            % endif\n        % endif\n        % if mgmtProfile.sshConfiguration.vrfConfigs:\nmanagement ssh\n            % for vrf in mgmtProfile.sshConfiguration.vrfConfigs:\n vrf ${vrf.vrfName}\n                % if vrf.enableSsh:\n   no shutdown\n                % else:\n   shutdown\n                % endif\n            % endfor\n        % endif\n\n        % if mgmtProfile.consoleConfiguration.idleTimeout:\nmanagement console\n idle-timeout ${mgmtProfile.consoleConfiguration.idleTimeout}\n        % endif\n\n        % if mgmtProfile.apiConfiguration.disableRestApi:\nmanagement api http-commands\n shutdown\n        % else:\nmanagement api http-commands\n no shutdown\n        % endif\n        \n        % if mgmtProfile.apiConfiguration.enableApiViaHttp:\nmanagement api http-commands\n  protocol http\n        % else:\nmanagement api http-commands\n  no protocol http\n        % endif\n\n        % if mgmtProfile.apiConfiguration.enableApiViaHttps:\nmanagement api http-commands\n  protocol https\n        % else:\nmanagement api http-commands\n  no protocol https\n        % endif\n        % if mgmtProfile.apiConfiguration.vrfConfigs:\nmanagement api http-commands\n            % for vrf in mgmtProfile.apiConfiguration.vrfConfigs:\n vrf ${vrf.vrfName}\n                % if vrf.enableRestApi:\n   no shutdown\n                % else:\n   shutdown\n                % endif\n            % endfor\n        % endif\n        ${mgmtProfile.get(\"eosCli\")}\n    % endif     \n% endif"
       input_schema:
         fields:
           values:
-            276d7918-d987-4bfa-a740-3857d984e438:
-              id: 276d7918-d987-4bfa-a740-3857d984e438
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: idleTimeout
-              label: Idle Timeout
-              description: Idle timeout in seconds (0-86400)
-              required: false
-              boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: 0..86400
-                dynamic_options: null
-                extra_values_allowed: false
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            efdaf41b-33e6-4aab-9a08-290da7c081cd:
-              id: efdaf41b-33e6-4aab-9a08-290da7c081cd
-              type: INPUT_FIELD_TYPE_GROUP
-              name: sshConfiguration
-              label: SSH Configuration
+            2f5768f3-11e0-4f01-a17f-acd5bf1865f5:
+              id: 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfName
+              label: VRF Name
               description: ''
               required: false
               boolean_props: null
               integer_props: null
               float_props: null
-              string_props: null
-              group_props:
-                members:
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            fc7e5535-8c6e-4324-9f49-5c9b83ea6927:
+              id: fc7e5535-8c6e-4324-9f49-5c9b83ea6927
+              type: INPUT_FIELD_TYPE_STRING
+              name: profileName
+              label: Profile Name
+              description: Name of the Profile
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            64dd3206-3522-40df-b485-b052b75c111c:
+              id: 64dd3206-3522-40df-b485-b052b75c111c
+              type: INPUT_FIELD_TYPE_STRING
+              name: eosCli
+              label: EOS CLI
+              description: Enter other Management protocol EOS CLI commands here.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee:
+              id: 5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDenyRemark
+              label: Permit Deny Remark
+              description: Select Permit, Deny, or Remark
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
                   values:
-                    - 8bb6c7fa-8164-4f83-865f-c6518dc2e262
-                    - daabc37d-e867-45c3-afb1-4cd8ff48e228
-                    - 3ec2cba9-aaec-4be3-97f5-cce2d0c86b05
-                    - bf967c24-5036-4f59-945b-ffb04710c65f
-                    - 1be51368-2501-49a2-b6b9-e76cc425c82c
-                    - 9c8d4aa8-edff-41eb-b5af-b708c35c8f20
-                    - 9f377018-2821-4894-94ba-25bc8d1058ba
+                    - permit
+                    - deny
+                    - remark
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5a767c4b-b5e6-47f9-9184-3c902f23afd0:
+              id: 5a767c4b-b5e6-47f9-9184-3c902f23afd0
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfName
+              label: VRF Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
@@ -266,12 +177,105 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            5c778d79-9408-49af-a48f-d5044fd7779b:
-              id: 5c778d79-9408-49af-a48f-d5044fd7779b
+            67509bef-60a6-46d1-9e52-5a78895b6c2c:
+              id: 67509bef-60a6-46d1-9e52-5a78895b6c2c
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfConfigs
+              label: VRF Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d
+                key: 5a767c4b-b5e6-47f9-9184-3c902f23afd0
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d22581d1-2e84-40ae-b7fc-1bc03a107e59:
+              id: d22581d1-2e84-40ae-b7fc-1bc03a107e59
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: isHost
+              label: Is Host
+              description: The entry is for a host IP
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            6d249939-8f95-4cfd-b5fc-ce9e9e31c874:
+              id: 6d249939-8f95-4cfd-b5fc-ce9e9e31c874
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableApiViaHttps
+              label: Enable REST API via HTTPS
+              description: ''
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 91911a29-0d7a-4366-84f9-70b3efd8decb
+                    - 0addf3de-ca03-47d9-ac7a-22773423170e
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            05e54108-4f03-4c09-b76c-629c559d5a0e:
+              id: 05e54108-4f03-4c09-b76c-629c559d5a0e
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: sessionLimitPerHost
+              label: Session Limit Per Host
+              description: Maximum number of telnet sessions from a single host (Range 1-20) (Default is 20)
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..20
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            276d7918-d987-4bfa-a740-3857d984e438:
+              id: 276d7918-d987-4bfa-a740-3857d984e438
               type: INPUT_FIELD_TYPE_INTEGER
               name: idleTimeout
               label: Idle Timeout
-              description: Idle Timeout in Seconds (Range 0-86400)
+              description: Idle timeout in seconds (0-86400)
               required: false
               boolean_props: null
               integer_props:
@@ -287,21 +291,95 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            16e12588-b07a-412f-8c5a-61f04a505497:
-              id: 16e12588-b07a-412f-8c5a-61f04a505497
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: vrfConfigs
-              label: VRF Configuration
+            7d46a1db-4990-453f-9637-a256d8e0b936:
+              id: 7d46a1db-4990-453f-9637-a256d8e0b936
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableTelnet
+              label: Enable Telnet
+              description: Enable Telnet in this VRF
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            894f2a13-d795-4e57-9b71-80ef09e090cc:
+              id: 894f2a13-d795-4e57-9b71-80ef09e090cc
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableTelnetAccess
+              label: Enable Telnet Access
+              description: Enable Telnet Access to Device
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            874e9598-cc48-4821-98f8-ae2b6c853967:
+              id: 874e9598-cc48-4821-98f8-ae2b6c853967
+              type: INPUT_FIELD_TYPE_STRING
+              name: aclName
+              label: ACL Name
               description: ''
               required: false
               boolean_props: null
               integer_props: null
               float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a9a89508-c5cf-462a-8dd0-46f91ff455f3:
+              id: a9a89508-c5cf-462a-8dd0-46f91ff455f3
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: log
+              label: Log
+              description: Enable counts for this ACL entry
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
               string_props: null
               group_props: null
-              collection_props:
-                base_field_id: 3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe
-                key: fedc2c45-98da-43d9-9fda-bbd13a812f39
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            39a2839d-ffdc-4305-a7da-b28f61758559:
+              id: 39a2839d-ffdc-4305-a7da-b28f61758559
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableRestApi
+              label: Enable REST API
+              description: Enable REST API in this VRF
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
@@ -321,90 +399,6 @@
                 extra_values_allowed: false
               float_props: null
               string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            c97c1b57-439a-418c-a7d4-42c180a0f25b:
-              id: c97c1b57-439a-418c-a7d4-42c180a0f25b
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: mgmtProtocolAcLs
-              label: Management Protocol ACLs
-              description: Standard ACLs used to control where you can Telnet/SSH from
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 04a76287-5a86-4baa-9bff-f296b11f902d
-                key: 874e9598-cc48-4821-98f8-ae2b6c853967
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            25b4c720-4979-4b78-853a-f2ab34a58438:
-              id: 25b4c720-4979-4b78-853a-f2ab34a58438
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: aclLines
-              label: ACL Lines
-              description: Configure the ACL
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 20aad40a-27e5-492a-aef5-e6e1309fad3e
-                key: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            fc7e5535-8c6e-4324-9f49-5c9b83ea6927:
-              id: fc7e5535-8c6e-4324-9f49-5c9b83ea6927
-              type: INPUT_FIELD_TYPE_STRING
-              name: profileName
-              label: Profile Name
-              description: Name of the Profile
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            572de60c-482e-4013-a323-49c064f3fa4a:
-              id: 572de60c-482e-4013-a323-49c064f3fa4a
-              type: INPUT_FIELD_TYPE_STRING
-              name: description
-              label: Description
-              description: Enter a description if this is for a Remark
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
               group_props: null
               collection_props: null
               resolver_props: null
@@ -436,60 +430,19 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            a1ecc338-10da-48e0-af7e-8db9afb08864:
-              id: a1ecc338-10da-48e0-af7e-8db9afb08864
-              type: INPUT_FIELD_TYPE_GROUP
-              name: profileAssignmentGroup
-              label: Profile Assignment
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - a3f671a4-d0c5-444f-b894-c0a3aed5749e
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            91911a29-0d7a-4366-84f9-70b3efd8decb:
-              id: 91911a29-0d7a-4366-84f9-70b3efd8decb
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: managementProtocolProfiles
-              label: Management Protocol Profiles
-              description: Create Profiles for SSH, Telnet, Console, and REST API configuration
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: 4940dd29-6590-4c66-a479-94bad0f66649
-                key: fc7e5535-8c6e-4324-9f49-5c9b83ea6927
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee:
-              id: 5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee
+            77de1184-7779-468e-802c-745fab5aa32c:
+              id: 77de1184-7779-468e-802c-745fab5aa32c
               type: INPUT_FIELD_TYPE_STRING
-              name: permitDenyRemark
-              label: Permit Deny Remark
-              description: Select Permit, Deny, or Remark
+              name: wildcardMask
+              label: Wildcard Mask
+              description: If source is a network address and it wasn't defined with CIDR notation, enter the wildcard mask here
               required: false
               boolean_props: null
               integer_props: null
               float_props: null
               string_props:
                 default_value: null
-                static_options:
-                  values:
-                    - permit
-                    - deny
-                    - remark
+                static_options: null
                 dynamic_options: null
                 length: null
                 pattern: null
@@ -501,12 +454,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            67509bef-60a6-46d1-9e52-5a78895b6c2c:
-              id: 67509bef-60a6-46d1-9e52-5a78895b6c2c
+            25b4c720-4979-4b78-853a-f2ab34a58438:
+              id: 25b4c720-4979-4b78-853a-f2ab34a58438
               type: INPUT_FIELD_TYPE_COLLECTION
-              name: vrfConfigs
-              label: VRF Configuration
-              description: ''
+              name: aclLines
+              label: ACL Lines
+              description: Configure the ACL
               required: false
               boolean_props: null
               integer_props: null
@@ -514,17 +467,37 @@
               string_props: null
               group_props: null
               collection_props:
-                base_field_id: bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d
-                key: 5a767c4b-b5e6-47f9-9184-3c902f23afd0
+                base_field_id: 20aad40a-27e5-492a-aef5-e6e1309fad3e
+                key: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            39a2839d-ffdc-4305-a7da-b28f61758559:
-              id: 39a2839d-ffdc-4305-a7da-b28f61758559
+            cc004c00-ff40-4828-9791-4f09914b3ef0:
+              id: cc004c00-ff40-4828-9791-4f09914b3ef0
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: VRF Configuration Group
+              description: Group of members for VRF Configuration
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
+                    - 9fadd007-a33b-4897-935f-7071504f2c51
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            fff52111-9ecf-4e45-a558-8bc0feb354ba:
+              id: fff52111-9ecf-4e45-a558-8bc0feb354ba
               type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableRestApi
-              label: Enable REST API
-              description: Enable REST API in this VRF
+              name: anySource
+              label: Any Source
+              description: Permit or deny from any source
               required: false
               boolean_props:
                 default_value: false
@@ -536,8 +509,29 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            daabc37d-e867-45c3-afb1-4cd8ff48e228:
-              id: daabc37d-e867-45c3-afb1-4cd8ff48e228
+            9c8d4aa8-edff-41eb-b5af-b708c35c8f20:
+              id: 9c8d4aa8-edff-41eb-b5af-b708c35c8f20
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: connectionLimitPerHost
+              label: Connection-Limit Per Host
+              description: Max number of SSH Sessions from a single host.  (Range 1-20.  Default is 20)
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..20
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5c778d79-9408-49af-a48f-d5044fd7779b:
+              id: 5c778d79-9408-49af-a48f-d5044fd7779b
               type: INPUT_FIELD_TYPE_INTEGER
               name: idleTimeout
               label: Idle Timeout
@@ -557,44 +551,49 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            f2567664-29c8-44fd-b0f4-1a1758d7d289:
-              id: f2567664-29c8-44fd-b0f4-1a1758d7d289
-              type: INPUT_FIELD_TYPE_GROUP
-              name: apiConfiguration
-              label: REST API Configuration
-              description: ''
+            56cee348-bd89-48a1-9290-7f88b3a3f066:
+              id: 56cee348-bd89-48a1-9290-7f88b3a3f066
+              type: INPUT_FIELD_TYPE_STRING
+              name: sourceIP
+              label: Source
+              description: Source IP.  Can use CIDR notation if it is a network, or use the wildcard mask field
               required: false
               boolean_props: null
               integer_props: null
               float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - bcdab784-e100-4622-99a8-079c706a3950
-                    - 6d249939-8f95-4cfd-b5fc-ce9e9e31c874
-                    - a3e7ee0c-a205-4dd4-b271-4413015ecd3a
-                    - 67509bef-60a6-46d1-9e52-5a78895b6c2c
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            5348a24b-cd7b-4633-bf1d-04f54331950f:
-              id: 5348a24b-cd7b-4633-bf1d-04f54331950f
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: seqNumber
-              label: Seq Number
-              description: Sequence Number
+            fedc2c45-98da-43d9-9fda-bbd13a812f39:
+              id: fedc2c45-98da-43d9-9fda-bbd13a812f39
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfName
+              label: VRF Name
+              description: VRF Name
               required: false
               boolean_props: null
-              integer_props:
+              integer_props: null
+              float_props: null
+              string_props:
                 default_value: null
                 static_options: null
-                range: null
                 dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
                 extra_values_allowed: false
-              float_props: null
-              string_props: null
               group_props: null
               collection_props: null
               resolver_props: null
@@ -647,42 +646,8 @@
                 tag_filter_query: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            6d249939-8f95-4cfd-b5fc-ce9e9e31c874:
-              id: 6d249939-8f95-4cfd-b5fc-ce9e9e31c874
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableApiViaHttps
-              label: Enable REST API via HTTPS
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            894f2a13-d795-4e57-9b71-80ef09e090cc:
-              id: 894f2a13-d795-4e57-9b71-80ef09e090cc
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableTelnetAccess
-              label: Enable Telnet Access
-              description: Enable Telnet Access to Device
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe:
-              id: 3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe
+            bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d:
+              id: bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d
               type: INPUT_FIELD_TYPE_GROUP
               name: value
               label: VRF Configuration Group
@@ -695,64 +660,8 @@
               group_props:
                 members:
                   values:
-                    - fedc2c45-98da-43d9-9fda-bbd13a812f39
-                    - 7d46a1db-4990-453f-9637-a256d8e0b936
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            9fadd007-a33b-4897-935f-7071504f2c51:
-              id: 9fadd007-a33b-4897-935f-7071504f2c51
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableSsh
-              label: Enable SSH
-              description: Enable SSH In this VRF
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            bf967c24-5036-4f59-945b-ffb04710c65f:
-              id: bf967c24-5036-4f59-945b-ffb04710c65f
-              type: INPUT_FIELD_TYPE_COLLECTION
-              name: vrfConfigs
-              label: VRF Configuration
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props:
-                base_field_id: cc004c00-ff40-4828-9791-4f09914b3ef0
-                key: 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            05e54108-4f03-4c09-b76c-629c559d5a0e:
-              id: 05e54108-4f03-4c09-b76c-629c559d5a0e
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: sessionLimitPerHost
-              label: Session Limit Per Host
-              description: Maximum number of telnet sessions from a single host (Range 1-20) (Default is 20)
-              required: false
-              boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: 1..20
-                dynamic_options: null
-                extra_values_allowed: false
-              float_props: null
-              string_props: null
-              group_props: null
+                    - 5a767c4b-b5e6-47f9-9184-3c902f23afd0
+                    - 39a2839d-ffdc-4305-a7da-b28f61758559
               collection_props: null
               resolver_props: null
               auto_fill_action_id: ''
@@ -778,54 +687,6 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            fedc2c45-98da-43d9-9fda-bbd13a812f39:
-              id: fedc2c45-98da-43d9-9fda-bbd13a812f39
-              type: INPUT_FIELD_TYPE_STRING
-              name: vrfName
-              label: VRF Name
-              description: VRF Name
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            2f5768f3-11e0-4f01-a17f-acd5bf1865f5:
-              id: 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
-              type: INPUT_FIELD_TYPE_STRING
-              name: vrfName
-              label: VRF Name
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
             8bb6c7fa-8164-4f83-865f-c6518dc2e262:
               id: 8bb6c7fa-8164-4f83-865f-c6518dc2e262
               type: INPUT_FIELD_TYPE_BOOLEAN
@@ -836,157 +697,6 @@
               boolean_props:
                 default_value: false
               integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            64dd3206-3522-40df-b485-b052b75c111c:
-              id: 64dd3206-3522-40df-b485-b052b75c111c
-              type: INPUT_FIELD_TYPE_STRING
-              name: eosCli
-              label: EOS CLI
-              description: Enter other Management protocol EOS CLI commands here.
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            root:
-              id: root
-              type: INPUT_FIELD_TYPE_GROUP
-              name: ''
-              label: ''
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 91911a29-0d7a-4366-84f9-70b3efd8decb
-                    - 0addf3de-ca03-47d9-ac7a-22773423170e
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: null
-              tag_matcher_props: null
-            874e9598-cc48-4821-98f8-ae2b6c853967:
-              id: 874e9598-cc48-4821-98f8-ae2b6c853967
-              type: INPUT_FIELD_TYPE_STRING
-              name: aclName
-              label: ACL Name
-              description: ''
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            9f377018-2821-4894-94ba-25bc8d1058ba:
-              id: 9f377018-2821-4894-94ba-25bc8d1058ba
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: loginTimeout
-              label: Login Timeout
-              description: Set the time allowed for a user to log in via SSH in seconds (Range 1-600.  Default is 120)
-              required: false
-              boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: 1..600
-                dynamic_options: null
-                extra_values_allowed: false
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a9a89508-c5cf-462a-8dd0-46f91ff455f3:
-              id: a9a89508-c5cf-462a-8dd0-46f91ff455f3
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: log
-              label: Log
-              description: Enable counts for this ACL entry
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            56cee348-bd89-48a1-9290-7f88b3a3f066:
-              id: 56cee348-bd89-48a1-9290-7f88b3a3f066
-              type: INPUT_FIELD_TYPE_STRING
-              name: sourceIP
-              label: Source
-              description: Source IP.  Can use CIDR notation if it is a network, or use the wildcard mask field
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props:
-                default_value: null
-                static_options: null
-                dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
-                extra_values_allowed: false
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            9c8d4aa8-edff-41eb-b5af-b708c35c8f20:
-              id: 9c8d4aa8-edff-41eb-b5af-b708c35c8f20
-              type: INPUT_FIELD_TYPE_INTEGER
-              name: connectionLimitPerHost
-              label: Connection-Limit Per Host
-              description: Max number of SSH Sessions from a single host.  (Range 1-20.  Default is 20)
-              required: false
-              boolean_props: null
-              integer_props:
-                default_value: null
-                static_options: null
-                range: 1..20
-                dynamic_options: null
-                extra_values_allowed: false
               float_props: null
               string_props: null
               group_props: null
@@ -1018,12 +728,52 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            d22581d1-2e84-40ae-b7fc-1bc03a107e59:
-              id: d22581d1-2e84-40ae-b7fc-1bc03a107e59
+            f2567664-29c8-44fd-b0f4-1a1758d7d289:
+              id: f2567664-29c8-44fd-b0f4-1a1758d7d289
+              type: INPUT_FIELD_TYPE_GROUP
+              name: apiConfiguration
+              label: REST API Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - bcdab784-e100-4622-99a8-079c706a3950
+                    - 6d249939-8f95-4cfd-b5fc-ce9e9e31c874
+                    - a3e7ee0c-a205-4dd4-b271-4413015ecd3a
+                    - 67509bef-60a6-46d1-9e52-5a78895b6c2c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            16e12588-b07a-412f-8c5a-61f04a505497:
+              id: 16e12588-b07a-412f-8c5a-61f04a505497
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfConfigs
+              label: VRF Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe
+                key: fedc2c45-98da-43d9-9fda-bbd13a812f39
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a3e7ee0c-a205-4dd4-b271-4413015ecd3a:
+              id: a3e7ee0c-a205-4dd4-b271-4413015ecd3a
               type: INPUT_FIELD_TYPE_BOOLEAN
-              name: isHost
-              label: Is Host
-              description: The entry is for a host IP
+              name: disableRestApi
+              label: Disable REST API
+              description: ''
               required: false
               boolean_props:
                 default_value: false
@@ -1035,20 +785,87 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            7d46a1db-4990-453f-9637-a256d8e0b936:
-              id: 7d46a1db-4990-453f-9637-a256d8e0b936
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: enableTelnet
-              label: Enable Telnet
-              description: Enable Telnet in this VRF
+            daabc37d-e867-45c3-afb1-4cd8ff48e228:
+              id: daabc37d-e867-45c3-afb1-4cd8ff48e228
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: idleTimeout
+              label: Idle Timeout
+              description: Idle Timeout in Seconds (Range 0-86400)
               required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 0..86400
+                dynamic_options: null
+                extra_values_allowed: false
               float_props: null
               string_props: null
               group_props: null
               collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            04a76287-5a86-4baa-9bff-f296b11f902d:
+              id: 04a76287-5a86-4baa-9bff-f296b11f902d
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Management Protocol ACLs Group
+              description: Group of members for Management Protocol ACLs
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 874e9598-cc48-4821-98f8-ae2b6c853967
+                    - 25b4c720-4979-4b78-853a-f2ab34a58438
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            efdaf41b-33e6-4aab-9a08-290da7c081cd:
+              id: efdaf41b-33e6-4aab-9a08-290da7c081cd
+              type: INPUT_FIELD_TYPE_GROUP
+              name: sshConfiguration
+              label: SSH Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 8bb6c7fa-8164-4f83-865f-c6518dc2e262
+                    - daabc37d-e867-45c3-afb1-4cd8ff48e228
+                    - 3ec2cba9-aaec-4be3-97f5-cce2d0c86b05
+                    - bf967c24-5036-4f59-945b-ffb04710c65f
+                    - 1be51368-2501-49a2-b6b9-e76cc425c82c
+                    - 9c8d4aa8-edff-41eb-b5af-b708c35c8f20
+                    - 9f377018-2821-4894-94ba-25bc8d1058ba
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c97c1b57-439a-418c-a7d4-42c180a0f25b:
+              id: c97c1b57-439a-418c-a7d4-42c180a0f25b
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: mgmtProtocolAcLs
+              label: Management Protocol ACLs
+              description: Standard ACLs used to control where you can Telnet/SSH from
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 04a76287-5a86-4baa-9bff-f296b11f902d
+                key: 874e9598-cc48-4821-98f8-ae2b6c853967
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
@@ -1077,119 +894,41 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            cc004c00-ff40-4828-9791-4f09914b3ef0:
-              id: cc004c00-ff40-4828-9791-4f09914b3ef0
+            a1ecc338-10da-48e0-af7e-8db9afb08864:
+              id: a1ecc338-10da-48e0-af7e-8db9afb08864
               type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: VRF Configuration Group
-              description: Group of members for VRF Configuration
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
-                    - 9fadd007-a33b-4897-935f-7071504f2c51
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d:
-              id: bc273ee1-cb4a-4e6a-9e0b-8c7283e1408d
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: VRF Configuration Group
-              description: Group of members for VRF Configuration
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 5a767c4b-b5e6-47f9-9184-3c902f23afd0
-                    - 39a2839d-ffdc-4305-a7da-b28f61758559
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            a3e7ee0c-a205-4dd4-b271-4413015ecd3a:
-              id: a3e7ee0c-a205-4dd4-b271-4413015ecd3a
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: disableRestApi
-              label: Disable REST API
-              description: ''
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            fff52111-9ecf-4e45-a558-8bc0feb354ba:
-              id: fff52111-9ecf-4e45-a558-8bc0feb354ba
-              type: INPUT_FIELD_TYPE_BOOLEAN
-              name: anySource
-              label: Any Source
-              description: Permit or deny from any source
-              required: false
-              boolean_props:
-                default_value: false
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props: null
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            04a76287-5a86-4baa-9bff-f296b11f902d:
-              id: 04a76287-5a86-4baa-9bff-f296b11f902d
-              type: INPUT_FIELD_TYPE_GROUP
-              name: value
-              label: Management Protocol ACLs Group
-              description: Group of members for Management Protocol ACLs
-              required: false
-              boolean_props: null
-              integer_props: null
-              float_props: null
-              string_props: null
-              group_props:
-                members:
-                  values:
-                    - 874e9598-cc48-4821-98f8-ae2b6c853967
-                    - 25b4c720-4979-4b78-853a-f2ab34a58438
-              collection_props: null
-              resolver_props: null
-              auto_fill_action_id: ''
-              tag_matcher_props: null
-            5a767c4b-b5e6-47f9-9184-3c902f23afd0:
-              id: 5a767c4b-b5e6-47f9-9184-3c902f23afd0
-              type: INPUT_FIELD_TYPE_STRING
-              name: vrfName
-              label: VRF Name
+              name: profileAssignmentGroup
+              label: Profile Assignment
               description: ''
               required: false
               boolean_props: null
               integer_props: null
               float_props: null
-              string_props:
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - a3f671a4-d0c5-444f-b894-c0a3aed5749e
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5348a24b-cd7b-4633-bf1d-04f54331950f:
+              id: 5348a24b-cd7b-4633-bf1d-04f54331950f
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: seqNumber
+              label: Seq Number
+              description: Sequence Number
+              required: false
+              boolean_props: null
+              integer_props:
                 default_value: null
                 static_options: null
+                range: null
                 dynamic_options: null
-                length: null
-                pattern: null
-                format: null
-                is_secret: false
                 extra_values_allowed: false
+              float_props: null
+              string_props: null
               group_props: null
               collection_props: null
               resolver_props: null
@@ -1208,7 +947,9 @@
               string_props:
                 default_value: null
                 static_options: null
-                dynamic_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"874e9598-cc48-4821-98f8-ae2b6c853967"}'
                 length: null
                 pattern: null
                 format: null
@@ -1219,12 +960,12 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
-            77de1184-7779-468e-802c-745fab5aa32c:
-              id: 77de1184-7779-468e-802c-745fab5aa32c
+            572de60c-482e-4013-a323-49c064f3fa4a:
+              id: 572de60c-482e-4013-a323-49c064f3fa4a
               type: INPUT_FIELD_TYPE_STRING
-              name: wildcardMask
-              label: Wildcard Mask
-              description: If source is a network address and it wasn't defined with CIDR notation, enter the wildcard mask here
+              name: description
+              label: Description
+              description: Enter a description if this is for a Remark
               required: false
               boolean_props: null
               integer_props: null
@@ -1238,6 +979,65 @@
                 format: null
                 is_secret: false
                 extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe:
+              id: 3c7a2242-390a-4e8c-8dfc-2ed5f3a584fe
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: VRF Configuration Group
+              description: Group of members for VRF Configuration
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - fedc2c45-98da-43d9-9fda-bbd13a812f39
+                    - 7d46a1db-4990-453f-9637-a256d8e0b936
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bf967c24-5036-4f59-945b-ffb04710c65f:
+              id: bf967c24-5036-4f59-945b-ffb04710c65f
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfConfigs
+              label: VRF Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: cc004c00-ff40-4828-9791-4f09914b3ef0
+                key: 2f5768f3-11e0-4f01-a17f-acd5bf1865f5
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9f377018-2821-4894-94ba-25bc8d1058ba:
+              id: 9f377018-2821-4894-94ba-25bc8d1058ba
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: loginTimeout
+              label: Login Timeout
+              description: Set the time allowed for a user to log in via SSH in seconds (Range 1-600.  Default is 120)
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..600
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
               group_props: null
               collection_props: null
               resolver_props: null
@@ -1256,7 +1056,9 @@
               string_props:
                 default_value: null
                 static_options: null
-                dynamic_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"874e9598-cc48-4821-98f8-ae2b6c853967"}'
                 length: null
                 pattern: null
                 format: null
@@ -1267,6 +1069,41 @@
               resolver_props: null
               auto_fill_action_id: ''
               tag_matcher_props: null
+            91911a29-0d7a-4366-84f9-70b3efd8decb:
+              id: 91911a29-0d7a-4366-84f9-70b3efd8decb
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: managementProtocolProfiles
+              label: Management Protocol Profiles
+              description: Create Profiles for SSH, Telnet, Console, and REST API configuration
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 4940dd29-6590-4c66-a479-94bad0f66649
+                key: fc7e5535-8c6e-4324-9f49-5c9b83ea6927
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9fadd007-a33b-4897-935f-7071504f2c51:
+              id: 9fadd007-a33b-4897-935f-7071504f2c51
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: enableSsh
+              label: Enable SSH
+              description: Enable SSH In this VRF
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
         layout:
-          value: '{"91911a29-0d7a-4366-84f9-70b3efd8decb":{"key":"91911a29-0d7a-4366-84f9-70b3efd8decb","type":"INPUT","isPageLayout":true},"20aad40a-27e5-492a-aef5-e6e1309fad3e":{"key":"20aad40a-27e5-492a-aef5-e6e1309fad3e","type":"INPUT","order":["5348a24b-cd7b-4633-bf1d-04f54331950f","5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee","572de60c-482e-4013-a323-49c064f3fa4a","fff52111-9ecf-4e45-a558-8bc0feb354ba","d22581d1-2e84-40ae-b7fc-1bc03a107e59","56cee348-bd89-48a1-9290-7f88b3a3f066","77de1184-7779-468e-802c-745fab5aa32c","a9a89508-c5cf-462a-8dd0-46f91ff455f3"]},"572de60c-482e-4013-a323-49c064f3fa4a":{"key":"572de60c-482e-4013-a323-49c064f3fa4a","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"SHOW"}},"type":"INPUT"},"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"key":"fff52111-9ecf-4e45-a558-8bc0feb354ba","type":"INPUT","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND"},"d22581d1-2e84-40ae-b7fc-1bc03a107e59":{"key":"d22581d1-2e84-40ae-b7fc-1bc03a107e59","dependency":{"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"56cee348-bd89-48a1-9290-7f88b3a3f066":{"key":"56cee348-bd89-48a1-9290-7f88b3a3f066","dependency":{"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"77de1184-7779-468e-802c-745fab5aa32c":{"key":"77de1184-7779-468e-802c-745fab5aa32c","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"},"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"d22581d1-2e84-40ae-b7fc-1bc03a107e59":{"value":[true],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"a9a89508-c5cf-462a-8dd0-46f91ff455f3":{"key":"a9a89508-c5cf-462a-8dd0-46f91ff455f3","type":"INPUT","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}}},"f2567664-29c8-44fd-b0f4-1a1758d7d289":{"key":"f2567664-29c8-44fd-b0f4-1a1758d7d289","type":"INPUT","order":["a3e7ee0c-a205-4dd4-b271-4413015ecd3a","bcdab784-e100-4622-99a8-079c706a3950","6d249939-8f95-4cfd-b5fc-ce9e9e31c874","67509bef-60a6-46d1-9e52-5a78895b6c2c"]},"4940dd29-6590-4c66-a479-94bad0f66649":{"key":"4940dd29-6590-4c66-a479-94bad0f66649","type":"INPUT","order":["fc7e5535-8c6e-4324-9f49-5c9b83ea6927","ba2707d0-ff04-4c01-8b94-22a60c07fd8a","efdaf41b-33e6-4aab-9a08-290da7c081cd","3a49a097-e7a9-4eb6-b25f-482e1c080e35","f2567664-29c8-44fd-b0f4-1a1758d7d289","c97c1b57-439a-418c-a7d4-42c180a0f25b","64dd3206-3522-40df-b485-b052b75c111c"]},"64dd3206-3522-40df-b485-b052b75c111c":{"key":"64dd3206-3522-40df-b485-b052b75c111c","type":"INPUT","isMultiLine":true,"syntax":"aristaConfig"},"16e12588-b07a-412f-8c5a-61f04a505497":{"key":"16e12588-b07a-412f-8c5a-61f04a505497","isPageLayout":false,"type":"INPUT"},"bf967c24-5036-4f59-945b-ffb04710c65f":{"key":"bf967c24-5036-4f59-945b-ffb04710c65f","isPageLayout":false,"type":"INPUT"},"67509bef-60a6-46d1-9e52-5a78895b6c2c":{"key":"67509bef-60a6-46d1-9e52-5a78895b6c2c","isPageLayout":false,"type":"INPUT"},"efdaf41b-33e6-4aab-9a08-290da7c081cd":{"key":"efdaf41b-33e6-4aab-9a08-290da7c081cd","type":"INPUT","order":["8bb6c7fa-8164-4f83-865f-c6518dc2e262","daabc37d-e867-45c3-afb1-4cd8ff48e228","9f377018-2821-4894-94ba-25bc8d1058ba","1be51368-2501-49a2-b6b9-e76cc425c82c","9c8d4aa8-edff-41eb-b5af-b708c35c8f20","3ec2cba9-aaec-4be3-97f5-cce2d0c86b05","bf967c24-5036-4f59-945b-ffb04710c65f"]}}'
+          value: '{"91911a29-0d7a-4366-84f9-70b3efd8decb":{"key":"91911a29-0d7a-4366-84f9-70b3efd8decb","type":"INPUT","isPageLayout":true},"20aad40a-27e5-492a-aef5-e6e1309fad3e":{"key":"20aad40a-27e5-492a-aef5-e6e1309fad3e","type":"INPUT","order":["5348a24b-cd7b-4633-bf1d-04f54331950f","5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee","572de60c-482e-4013-a323-49c064f3fa4a","fff52111-9ecf-4e45-a558-8bc0feb354ba","d22581d1-2e84-40ae-b7fc-1bc03a107e59","56cee348-bd89-48a1-9290-7f88b3a3f066","77de1184-7779-468e-802c-745fab5aa32c","a9a89508-c5cf-462a-8dd0-46f91ff455f3"]},"572de60c-482e-4013-a323-49c064f3fa4a":{"key":"572de60c-482e-4013-a323-49c064f3fa4a","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"SHOW"}},"type":"INPUT"},"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"key":"fff52111-9ecf-4e45-a558-8bc0feb354ba","type":"INPUT","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND"},"d22581d1-2e84-40ae-b7fc-1bc03a107e59":{"key":"d22581d1-2e84-40ae-b7fc-1bc03a107e59","dependency":{"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"56cee348-bd89-48a1-9290-7f88b3a3f066":{"key":"56cee348-bd89-48a1-9290-7f88b3a3f066","dependency":{"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"77de1184-7779-468e-802c-745fab5aa32c":{"key":"77de1184-7779-468e-802c-745fab5aa32c","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"},"fff52111-9ecf-4e45-a558-8bc0feb354ba":{"value":[true],"mode":"HIDE"},"d22581d1-2e84-40ae-b7fc-1bc03a107e59":{"value":[true],"mode":"HIDE"}},"dependencyType":"AND","type":"INPUT"},"a9a89508-c5cf-462a-8dd0-46f91ff455f3":{"key":"a9a89508-c5cf-462a-8dd0-46f91ff455f3","type":"INPUT","dependency":{"5072a6b9-00d4-4d5b-b44d-a0b1ffaa18ee":{"value":["remark"],"mode":"HIDE"}}},"f2567664-29c8-44fd-b0f4-1a1758d7d289":{"key":"f2567664-29c8-44fd-b0f4-1a1758d7d289","type":"INPUT","order":["a3e7ee0c-a205-4dd4-b271-4413015ecd3a","bcdab784-e100-4622-99a8-079c706a3950","6d249939-8f95-4cfd-b5fc-ce9e9e31c874","67509bef-60a6-46d1-9e52-5a78895b6c2c"]},"4940dd29-6590-4c66-a479-94bad0f66649":{"key":"4940dd29-6590-4c66-a479-94bad0f66649","type":"INPUT","order":["fc7e5535-8c6e-4324-9f49-5c9b83ea6927","c97c1b57-439a-418c-a7d4-42c180a0f25b","ba2707d0-ff04-4c01-8b94-22a60c07fd8a","efdaf41b-33e6-4aab-9a08-290da7c081cd","3a49a097-e7a9-4eb6-b25f-482e1c080e35","f2567664-29c8-44fd-b0f4-1a1758d7d289","64dd3206-3522-40df-b485-b052b75c111c"]},"64dd3206-3522-40df-b485-b052b75c111c":{"key":"64dd3206-3522-40df-b485-b052b75c111c","type":"INPUT","isMultiLine":true,"syntax":"aristaConfig"},"16e12588-b07a-412f-8c5a-61f04a505497":{"key":"16e12588-b07a-412f-8c5a-61f04a505497","isPageLayout":false,"type":"INPUT"},"bf967c24-5036-4f59-945b-ffb04710c65f":{"key":"bf967c24-5036-4f59-945b-ffb04710c65f","isPageLayout":false,"type":"INPUT"},"67509bef-60a6-46d1-9e52-5a78895b6c2c":{"key":"67509bef-60a6-46d1-9e52-5a78895b6c2c","isPageLayout":false,"type":"INPUT"},"efdaf41b-33e6-4aab-9a08-290da7c081cd":{"key":"efdaf41b-33e6-4aab-9a08-290da7c081cd","type":"INPUT","order":["8bb6c7fa-8164-4f83-865f-c6518dc2e262","daabc37d-e867-45c3-afb1-4cd8ff48e228","9f377018-2821-4894-94ba-25bc8d1058ba","1be51368-2501-49a2-b6b9-e76cc425c82c","9c8d4aa8-edff-41eb-b5af-b708c35c8f20","3ec2cba9-aaec-4be3-97f5-cce2d0c86b05","bf967c24-5036-4f59-945b-ffb04710c65f"]}}'
       from_package: ''
