@@ -4,6 +4,9 @@ These are custom studios that I made for Cloudvision.  To use, import the yanl f
 ## Banner Configuration
 Configure a MOTD and/or Login Banner and assign to devices by tags
 
+## Connectivity Monitoring with Hostnames for ICMP Probes
+A Clone of the Connectivity Monitor Studio that adds more descriptive comments and adds the ability to choose between IP or hostname for ICMP probes and if hostname is selected choose the IP version for DNS resolution of the hostname.
+
 ## Device AAA
 Create TACACS and RADIUS server configurations, AAA Device Groups, VRF and Source Interface profiles, and AAA Profiles to assign to devices
 
