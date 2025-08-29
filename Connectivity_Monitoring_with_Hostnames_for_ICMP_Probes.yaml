@@ -1,0 +1,769 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: c74bb473-ca81-4da5-b136-92a4e52b4cb5
+        workspace_id: ''
+      created_at: '2025-08-27T14:59:02.759Z'
+      created_by: mschulman
+      last_modified_at: '2025-08-28T14:53:32.457Z'
+      last_modified_by: mschulman
+      display_name: Connectivity Monitoring with Hostnames for ICMP Probes
+      description: Configure and assign host endpoints for monitoring by EOS probes.  Allows for sending ICMP probes to hostnames
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: |
+          <%
+            from cloudvision import cvlib
+
+            inputErrors = []
+            if not networkConfig:
+              return
+            cfg, rctx = networkConfig.resolveWithContext() # Get Current Device Monitored Hosts
+
+            hostCfgs = {}
+            interfaceSets = {}
+            vrfSets = {}
+            hostNameList = [h.name for h in hosts]
+
+            for intfSet in intfSets:
+              if intfSet.setName != "":
+                interfaceSets[intfSet.setName] = intfSet
+
+            for vrf in vrfs:
+              if vrf.vrfName != "":
+                vrfSets[vrf.vrfName] = vrf.vrfInterfaceSet
+
+            for i, hostCfg in enumerate(cfg.config.monitoredHosts):
+              for definition in hosts:
+                if definition.name == hostCfg.host:
+                  hostCfgs[definition.name] = definition
+              if hostCfg.host not in hostNameList:
+                message = f'Unknown host {hostCfg.host!r}, you must reference a valid host from {hostNameList}'
+                inputPath = ["networkConfig", str(rctx.index), "config", "monitoredHosts", str(i)]
+                fieldId = "hostConfiguration"
+                members = ["host"]
+                inputErrors.append(cvlib.InputError(message=message, inputPath=inputPath, fieldId=fieldId, members=members))
+          %>
+          %if len(cfg.config.monitoredHosts) > 0:
+          monitor connectivity
+            no shutdown
+          %  if "default" in vrfSets:
+          %    if vrfSets["default"] and vrfSets["default"] in interfaceSets:
+            interface set ${vrfSets["default"]} ${interfaceSets[vrfSets["default"]].intfSet}
+          %      if interfaceSets[vrfSets["default"]].addressOnly:
+            local-interfaces ${vrfSets["default"]} address-only default
+          %      elif not interfaceSets[vrfSets["default"]].addressOnly:
+            local-interfaces ${vrfSets["default"]} default
+          %      endif
+          %    endif
+          %  endif
+          %  for host, details in hostCfgs.items():
+          %    if details.vrf == "default" or details.vrf == "":
+          %      if details.localIntf in interfaceSets:
+            interface set ${details.localIntf} ${interfaceSets[details.localIntf].intfSet}
+          %      endif
+            host ${host}
+          %      if details.localIntf in interfaceSets and interfaceSets[details.localIntf].addressOnly:
+              local-interfaces ${details.localIntf} address-only
+          %      elif details.localIntf in interfaceSets and not interfaceSets[details.localIntf].addressOnly:
+              local-interfaces ${details.localIntf}
+          %      endif
+          %      if details.icmpDestinationType == "IP":
+          %        if details.ipAddr:
+              ip ${details.ipAddr}
+          %        endif
+          %      elif details.icmpDestinationType == "Hostname":
+          %        if details.hostname:
+          %          if details.ipVersion != "both":
+              ip hostname ${details.hostname} resolution ${details.ipVersion}
+          %          else:
+              ip hostname ${details.hostname}
+          %          endif
+          %        endif
+          %      endif
+          %      if details.description:
+              description ${details.description}
+          %      endif
+          %      if details.url:
+              url ${details.url}
+          %      endif
+          %      if details.tcpPort is not None:
+              tcp port ${details.tcpPort}
+          %      endif
+          %    endif
+          %  endfor
+          %  for host, details in hostCfgs.items():
+          %    if details.vrf != "default" and details.vrf != "":
+            vrf ${details.vrf}
+          %      if details.localIntf in interfaceSets:
+              interface set ${details.localIntf} ${interfaceSets[details.localIntf].intfSet}
+          %      endif
+              host ${host}
+          %      if details.localIntf in interfaceSets and interfaceSets[details.localIntf].addressOnly:
+                local-interfaces ${details.localIntf} address-only
+          %      elif details.localIntf in interfaceSets and not interfaceSets[details.localIntf].addressOnly:
+                local-interfaces ${details.localIntf}
+          %      endif
+          %      if details.icmpDestinationType == "IP":
+          %        if details.ipAddr:
+                ip ${details.ipAddr}
+          %        endif
+          %      elif details.icmpDestinationType == "Hostname":
+          %        if details.hostname:
+          %          if details.ipVersion != "both":
+              ip hostname ${details.hostname} resolution ${details.ipVersion}
+          %          else:
+              ip hostname ${details.hostname}
+          %          endif
+          %        endif
+          %      endif
+          %      if details.description:
+                description ${details.description}
+          %      endif
+          %      if details.url:
+                url ${details.url}
+          %      endif
+          %      if details.tcpPort is not None:
+                tcp port ${details.tcpPort}
+          %      endif
+          %    endif
+          %  endfor
+          %  for vrf, localIntf in vrfSets.items():
+          %    if localIntf:
+          %      if vrf != "default":
+            vrf ${vrf}
+          %        if localIntf in interfaceSets:
+              interface set ${localIntf} ${interfaceSets[localIntf].intfSet}
+          %          if interfaceSets[localIntf].addressOnly:
+              local-interfaces ${localIntf} address-only default
+          %          elif not interfaceSets[localIntf].addressOnly:
+              local-interfaces ${localIntf} default
+          %          endif
+          %        endif
+          %      endif
+          %    endif
+          %  endfor
+          %endif
+          <%
+          if inputErrors:
+              raise cvlib.InputErrorException(inputErrors=inputErrors) from None
+          %>
+      input_schema:
+        fields:
+          values:
+            hostLocalInterface:
+              id: hostLocalInterface
+              type: INPUT_FIELD_TYPE_STRING
+              name: localIntf
+              label: Local Interface
+              description: Local Interfaces need to be added to the Interface sets table
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"interfaceSetGroupName"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostName:
+              id: hostName
+              type: INPUT_FIELD_TYPE_STRING
+              name: name
+              label: Name
+              description: ''
+              required: true
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            addressOnly:
+              id: addressOnly
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: addressOnly
+              label: addressOnly
+              description: ' Set address only option for local interface'
+              required: false
+              boolean_props:
+                default_value: true
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostIpAddress:
+              id: hostIpAddress
+              type: INPUT_FIELD_TYPE_STRING
+              name: ipAddr
+              label: IP Address
+              description: IPv4 or IPv6 Address
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: ip
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostVrf:
+              id: hostVrf
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrf
+              label: VRF
+              description: VRFs need to be added to the VRFs table
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: default
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"vrfName"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hosts:
+              id: hosts
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: hosts
+              label: Hosts
+              description: Define a host that an EOS device will monitor as an endpoint.  You can then assign host(s) to devices below in the "Host Monitoring" Section.  If a host needs to use a VRF for connectivity, configure the VRF below and then you can add the VRF to the host. If you need to limit to using source interfaces, create an Interface Set and then you can add it to the host.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: host
+                key: hostName
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ce1f0753-32af-49d3-abab-66dee5064819:
+              id: ce1f0753-32af-49d3-abab-66dee5064819
+              type: INPUT_FIELD_TYPE_STRING
+              name: ipVersion
+              label: IP Version
+              description: Configure the IP Version for resolution.  If set to "both", it will try to resolve the hostname to both an IPv4 and IPv6 address.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: both
+                static_options:
+                  values:
+                    - ipv4
+                    - ipv6
+                    - both
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            interfaceSetGroupSet:
+              id: interfaceSetGroupSet
+              type: INPUT_FIELD_TYPE_STRING
+              name: intfSet
+              label: List of Interfaces
+              description: Comma separated list of Interfaces
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostConfigurationHost:
+              id: hostConfigurationHost
+              type: INPUT_FIELD_TYPE_STRING
+              name: host
+              label: Host
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"hostName"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostConfiguration:
+              id: hostConfiguration
+              type: INPUT_FIELD_TYPE_GROUP
+              name: hostConfiguration
+              label: Host Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - hostConfigurationHost
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostMonitoring:
+              id: hostMonitoring
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: networkConfig
+              label: Host Monitoring
+              description: Enable the Connectivity Monitoring agent on devices and assign hosts to monitor.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: deviceConfiguration
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            vrf:
+              id: vrf
+              type: INPUT_FIELD_TYPE_GROUP
+              name: vrf
+              label: VRF
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - vrfName
+                    - vrfInterfaceSet
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            85b01a73-a2be-4e45-be99-c0671083cf3a:
+              id: 85b01a73-a2be-4e45-be99-c0671083cf3a
+              type: INPUT_FIELD_TYPE_STRING
+              name: icmpDestinationType
+              label: ICMP Destination Type
+              description: If you wish to send ICMP Probes to this host, select whether you should use a hostname or IP to probe this device, otherwise leave blank.  If you use a hostname, you can choose to limit the hostname resolution to IPv4, IPv6 or both.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: IP
+                static_options:
+                  values:
+                    - IP
+                    - Hostname
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            host:
+              id: host
+              type: INPUT_FIELD_TYPE_GROUP
+              name: host
+              label: Host
+              description: The defintion of a single host
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - hostName
+                    - hostIpAddress
+                    - hostDescription
+                    - hostUrl
+                    - hostTcpPort
+                    - hostLocalInterface
+                    - hostVrf
+                    - c6345319-1341-445e-9e84-f10c031c6f57
+                    - 85b01a73-a2be-4e45-be99-c0671083cf3a
+                    - ce1f0753-32af-49d3-abab-66dee5064819
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - hosts
+                    - vrfs
+                    - interfaceSets
+                    - hostMonitoring
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            interfaceSetGroup:
+              id: interfaceSetGroup
+              type: INPUT_FIELD_TYPE_GROUP
+              name: set
+              label: Set
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - interfaceSetGroupName
+                    - interfaceSetGroupSet
+                    - addressOnly
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            deviceConfiguration:
+              id: deviceConfiguration
+              type: INPUT_FIELD_TYPE_GROUP
+              name: config
+              label: Device Configuration
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - monitoredHosts
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            vrfInterfaceSet:
+              id: vrfInterfaceSet
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfInterfaceSet
+              label: Default Interface Set
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"interfaceSetGroupName"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            vrfName:
+              id: vrfName
+              type: INPUT_FIELD_TYPE_STRING
+              name: vrfName
+              label: VRF Name
+              description: VRF for connectivity probes
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostDescription:
+              id: hostDescription
+              type: INPUT_FIELD_TYPE_STRING
+              name: description
+              label: Description
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: min..140
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c6345319-1341-445e-9e84-f10c031c6f57:
+              id: c6345319-1341-445e-9e84-f10c031c6f57
+              type: INPUT_FIELD_TYPE_STRING
+              name: hostname
+              label: Hostname
+              description: Send ICMP probe using Hostname
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostTcpPort:
+              id: hostTcpPort
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: tcpPort
+              label: TCP Port
+              description: Enter an optional TCP port that is used to monitor the total round trip time of a TCP 3-way handshake
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 0..65535
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            interfaceSetGroupName:
+              id: interfaceSetGroupName
+              type: INPUT_FIELD_TYPE_STRING
+              name: setName
+              label: Set Name
+              description: Configure the interface set for probing
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            interfaceSets:
+              id: interfaceSets
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: intfSets
+              label: Interface Sets
+              description: Configure List of source interfaces.  These can be assigned to VRFs and/or Hosts above.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: interfaceSetGroup
+                key: interfaceSetGroupName
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            monitoredHosts:
+              id: monitoredHosts
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: monitoredHosts
+              label: Monitored Hosts
+              description: Assign hosts to this group for EOS device monitoring.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: hostConfiguration
+                key: ''
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            vrfs:
+              id: vrfs
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: vrfs
+              label: VRFs
+              description: Configure List of VRFs.  These can then be added to hosts in the "Hosts Section".  If you need to add an Interface Set, make sure it is created in the "interface Sets" section below.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: vrf
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            hostUrl:
+              id: hostUrl
+              type: INPUT_FIELD_TYPE_STRING
+              name: url
+              label: HTTP Endpoint
+              description: Enter an optional URL that monitors whether the host has a reachable web server or not
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: url
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"interfaceSetGroupDefaultSet":{"key":"interfaceSetGroupDefaultSet","valueToLabelMap":{"True":"Yes","False":"No"},"type":"INPUT"},"host":{"key":"host","type":"INPUT","order":["hostName","85b01a73-a2be-4e45-be99-c0671083cf3a","hostIpAddress","c6345319-1341-445e-9e84-f10c031c6f57","ce1f0753-32af-49d3-abab-66dee5064819","hostDescription","hostUrl","hostTcpPort","hostVrf","hostLocalInterface"]},"hostVrf":{"key":"hostVrf","type":"INPUT","dependency":{"vrfName":{"value":["__ANY__"],"mode":"SHOW"}},"dependencyType":"OR"},"hostLocalInterface":{"key":"hostLocalInterface","type":"INPUT","dependency":{"interfaceSetGroupName":{"value":["__ANY__"],"mode":"SHOW"}}},"c6345319-1341-445e-9e84-f10c031c6f57":{"key":"c6345319-1341-445e-9e84-f10c031c6f57","dependency":{"85b01a73-a2be-4e45-be99-c0671083cf3a":{"value":["IP"],"mode":"HIDE"}},"type":"INPUT"},"hostIpAddress":{"key":"hostIpAddress","dependency":{"85b01a73-a2be-4e45-be99-c0671083cf3a":{"value":["Hostname"],"mode":"HIDE"}},"type":"INPUT"},"hosts":{"key":"hosts","type":"INPUT","isPageLayout":true},"ce1f0753-32af-49d3-abab-66dee5064819":{"key":"ce1f0753-32af-49d3-abab-66dee5064819","dependency":{"85b01a73-a2be-4e45-be99-c0671083cf3a":{"value":["Hostname"],"mode":"SHOW"}},"type":"INPUT"}}'
+      from_package: ''
