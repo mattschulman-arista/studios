@@ -1,0 +1,1317 @@
+- service: arista.studio.v1.StudioConfigService
+  method: Set
+  body:
+    value:
+      key:
+        studio_id: 05357bf8-dda9-4d58-9f74-4510a8f8818b
+        workspace_id: ''
+      created_at: '2025-09-12T16:38:52.451Z'
+      created_by: mschulman
+      last_modified_at: '2025-09-12T18:26:30.652Z'
+      last_modified_by: mschulman
+      display_name: Route Map and Lists
+      description: Configure Route-maps, Prefix-lists, Community-Lists, and AS-Path Lists which can then be referenced in Studios that have a route-map as a text field.
+      template:
+        type: TEMPLATE_TYPE_MAKO
+        body: "% if assignDevicesResolver:\n\t<% devicesGroup = assignDevicesResolver.resolve()['assignDevicesGroup'] %>\n\t<% ctx.info(f\"devicesGroup: {devicesGroup}\") %>\n\t% if devicesGroup.prefixLists:\n\t\t% for prefixList in devicesGroup.prefixLists:\n\t\t\t% if prefixList.addressFamily == \"ipv4\":\nip prefix-list ${prefixList.prefixListName}\n\t\t\t% else:\nipv6 prefix-list  ${prefixList.prefixListName}\n\t\t\t% endif\n\t\t\t% for seq in prefixList.prefixList:\n\t\t\t\t% if seq.prefixRange != \"exact-route\":\n  seq ${seq.sequenceNumber} ${seq.prefixListSeqAction} ${seq.prefix} ${seq.prefixRange} ${seq.maskLength}\n\t\t\t\t% else:\n  seq ${seq.sequenceNumber} ${seq.prefixListSeqAction} ${seq.prefix}\n\t\t\t\t% endif\n\t\t\t% endfor\n\t\t% endfor\n\t% endif\n\n\t% if devicesGroup.communityLists:\n\t\t% for communityList in devicesGroup.communityLists:\n\t\t\t% if communityList.communityListType == \"extended\":\n\t\t\t\t% for item in communityList.listMembers:\n\t\t\t\t\t% if communityList.regex:\nip extcommunity-list regexp ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t% else:\nip extcommunity-list ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t% endif\n\t\t\t\t% endfor\n\t\t\t% elif communityList.communityListType == \"large\":\n\t\t\t\t% for item in communityList.listMembers:\n\t\t\t\t\t% if communityList.regex:\nip large-community-list regexp ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t% else:\nip large-community-list ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t% endif\n\t\t\t\t% endfor\n\t\t\t% else:\n\t\t\t\t% for item in communityList.listMembers:\n\t\t\t\t\t% if item.community:\n\t\t\t\t\t\t% if communityList.regex:\nip community-list regexp ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t\t% else:\nip community-list ${communityList.communityListName} ${item.permitDeny} ${item.community}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.noExport:\nip community-list ${communityList.communityListName} ${item.permitDeny} no-export\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.noAdvertise:\nip community-list ${communityList.communityListName} ${item.permitDeny} no-advertise\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.localAs:\nip community-list ${communityList.communityListName} ${item.permitDeny} local-as\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.internet:\nip community-list ${communityList.communityListName} ${item.permitDeny} internet\n\t\t\t\t\t% endif\n\t\t\t\t% endfor\n\t\t\t% endif\n\t\t% endfor\n\t% endif\n\n\t% if devicesGroup.get(asPathRegexMode) == \"string\":\nip as-path regex-mode ${devicesGroup.asPathLists.regexMode}\n\t% endif\n\t% if devicesGroup.asPathAccessLists:\n\t\t% for asPathList in devicesGroup.asPathAccessLists:\n\t\t\t% for line in asPathList.asPathAccessListEntries:\n\t\t\t\t% if line.origin:\nip as-path access-list ${asPathList.asPathListName} ${line.permitDeny} ${line.asPath} ${line.origin}\n\t\t\t\t% else:\nip as-path access-list ${asPathList.asPathListName} ${line.permitDeny} ${line.asPath}\n\t\t\t\t% endif\n\t\t\t% endfor\n\t\t% endfor\n\t% endif\n\n\t% if devicesGroup.routeMaps:\n\t\t% for routeMap in devicesGroup.routeMaps:\n\t\t\t% for item in routeMap.routeMap:\n\t\t\t\t% if item.sequenceNumber and item.permitDeny:\nroute-map ${routeMap.routeMapName} ${item.permitDeny} ${item.sequenceNumber}\n\t\t\t\t\t% if item.description:\n  description ${item.description}\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.prefixList:\n\t\t\t\t\t\t% if item.ipVersion == \"ipv4\":\n  match ip address prefix-list ${item.prefixList}\n\t\t\t\t\t\t% else:\n  match ${item.ipVersion} address prefix-list ${item.prefixList}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.matchCommunity:\n\t\t\t\t\t\t% if item.communityType == \"standard\":\n  match community ${item.matchCommunity}\n\t\t\t\t\t\t% elif item.communityType == \"extended\":\n  match extcommunity ${item.matchCommunity}\n\t\t\t\t\t\t% elif item.communityType == \"large\":\n  match large-community ${item.matchCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.asPathList:\n  match as-path ${item.asPathList}\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.matchRouteType:\n  match route-type ${item.matchRouteType}\n\t\t\t\t\t% endif\n\t\t\t\t\t% if \":\" in item.setCommunity and item.communityType == \"standard\":\n\t\t\t\t\t\t% if item.setCommunityAttribute:\n  set community ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set community ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% elif \":\" in item.setCommunity and item.communityType == \"extended\":\n\t\t\t\t\t\t% if item.setCommunityAttribute:\n  set extcommunity ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set extcommunity ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% elif \":\" in item.setCommunity and item.communityType == \"large\":\n\t\t\t\t\t\t% if item.setCommunityAttribute:\n  set large-community ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set large-community ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% elif item.setCommunity and item.communityType == \"standard\":\n\t\t\t\t\t\t% if item.setCommunityAttribute:\n  set community community-list ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set community community-list ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% elif item.setCommunity and item.communityType == \"extended\":\n\t\t\t\t\t\t%  if item.setCommunityAttribute:\n  set extcommunity extcommunity-list ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set extcommunity extcommunity-list ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% elif item.setCommunity and item.communityType == \"large\":\n\t\t\t\t\t\t%  if item.setCommunityAttribute:\n  set large-community large-community-list ${item.setCommunity} ${item.setCommunityAttribute}\n\t\t\t\t\t\t% else:\n  set large-community large-community-list ${item.setCommunity}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.setIpNextHop:\n\t\t\t\t\t\t% if item.ipVersion == \"ipv4\":\n  set ip next-hop ${item.setIpNextHop}\n\t\t\t\t\t\t% else:\n  set ${item.ipVersion} next-hop ${item.setIpNextHop}\n\t\t\t\t\t\t% endif\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.localPref:\n  set local-preference ${item.localPref}\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.asPathPrependRepeat:\n  set as-path prepend auto repeat ${item.asPathPrependRepeat}\n\t\t\t\t\t% endif\n\t\t\t\t\t% if item.setOrigin:\n  set origin ${item.setOrigin}\n\t\t\t\t\t% endif\n\t\t\t\t% endif\n\t\t\t% endfor\n\t\t% endfor\n\t% endif\n% endif\n\n"
+      input_schema:
+        fields:
+          values:
+            8a8ca4cf-821c-4a1e-a347-803ed34919ea:
+              id: 8a8ca4cf-821c-4a1e-a347-803ed34919ea
+              type: INPUT_FIELD_TYPE_STRING
+              name: ipVersion
+              label: IP Version
+              description: Select the version of IP to be used when matching on a prefix-list or setting the next-hop
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - ipv4
+                    - ipv6
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            acfef14c-61d3-4683-8534-c134e27c307d:
+              id: acfef14c-61d3-4683-8534-c134e27c307d
+              type: INPUT_FIELD_TYPE_STRING
+              name: asPathListName
+              label: AS Path List Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e143741a-7238-48ea-8a48-d4d204c49a0c:
+              id: e143741a-7238-48ea-8a48-d4d204c49a0c
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: asPathAccessListEntries
+              label: AS Path Access-List Entries
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 40661dd0-8246-46e7-817c-bf145a055f8c
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e794be28-a634-4671-ab6e-cd26b4905b81:
+              id: e794be28-a634-4671-ab6e-cd26b4905b81
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Prefix List Group
+              description: Group of members for Prefix List
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 95d2be2f-a05c-48cb-a57f-92dc5a996f62
+                    - 88bccaa8-69bf-4e1f-9ce4-a426df1e944a
+                    - bd90d5eb-0b76-46bf-8bb7-d45e6c8f287b
+                    - e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f
+                    - f462f9cb-2670-4083-9822-78719ac8dbf4
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            08e714a9-d17d-4c1a-9cf7-8e29ceeb260b:
+              id: 08e714a9-d17d-4c1a-9cf7-8e29ceeb260b
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: listMembers
+              label: List Members
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 2c21cf5e-8108-4168-95b8-7efbae00cc6f
+                key: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            b41e8bb6-6bfd-42bc-852c-f2b0a5e75e7c:
+              id: b41e8bb6-6bfd-42bc-852c-f2b0a5e75e7c
+              type: INPUT_FIELD_TYPE_STRING
+              name: setCommunityAttribute
+              label: Set Community Attribute
+              description: Select if community to be set is additive, delete, or none
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - additive
+                    - delete
+                    - none
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c23d2457-f512-46f8-a24a-c73757e498c4:
+              id: c23d2457-f512-46f8-a24a-c73757e498c4
+              type: INPUT_FIELD_TYPE_STRING
+              name: description
+              label: Description
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0d3a5e1a-3719-427a-a4c2-84ccaf3cd8a6:
+              id: 0d3a5e1a-3719-427a-a4c2-84ccaf3cd8a6
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Prefix Lists Group
+              description: Group of members for Prefix Lists
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - dd917338-223b-4608-ba69-0584a7d5a955
+                    - bd4e92d5-95de-49f2-a0f7-f742dabba090
+                    - 7cb845ed-f3f8-440b-a954-1dd5d2ef2b53
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            2c21cf5e-8108-4168-95b8-7efbae00cc6f:
+              id: 2c21cf5e-8108-4168-95b8-7efbae00cc6f
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: List Members Group
+              description: Group of members for List Members
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 4b47cad2-d480-411d-bbfa-9371201ff25a
+                    - 7be95b3b-543e-4cb7-8178-7e80d67181a3
+                    - 7a4bc480-e8a7-4dc1-93b1-91b60f82fd01
+                    - a0e22b02-3d18-4f41-9edc-a03eb9625f68
+                    - 4c95d90b-88ce-4df3-a7db-f3358ec2a1ec
+                    - 9e74336b-8196-423f-ab7e-a6be5a8a7ee7
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            8c16d3f6-7680-459d-ad09-19c5b8b98d78:
+              id: 8c16d3f6-7680-459d-ad09-19c5b8b98d78
+              type: INPUT_FIELD_TYPE_STRING
+              name: asPathList
+              label: Match AS Path List
+              description: The AS Path Access-List to match
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"acfef14c-61d3-4683-8534-c134e27c307d"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5c745f63-1027-4fa2-a708-5628eb28f69a:
+              id: 5c745f63-1027-4fa2-a708-5628eb28f69a
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: AS Path Access-Lists Group
+              description: Group of members for AS Path Access-Lists
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - acfef14c-61d3-4683-8534-c134e27c307d
+                    - e143741a-7238-48ea-8a48-d4d204c49a0c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            8704d6bd-c4ea-463c-ac23-01c9edcc0a6c:
+              id: 8704d6bd-c4ea-463c-ac23-01c9edcc0a6c
+              type: INPUT_FIELD_TYPE_RESOLVER
+              name: assignDevicesResolver
+              label: Assign Devices
+              description: Add devices by tag and then create route-map, prefix-list, community-list, as-path list configs to apply
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props:
+                base_field_id: 02e4e6f8-d132-4300-ab3d-072df28ee1cb
+                display_mode: RESOLVER_FIELD_DISPLAY_MODE_SPARSE
+                input_mode: RESOLVER_FIELD_INPUT_MODE_MULTI_DEVICE_TAG
+                input_tag_label: null
+                tag_filter_query: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            c8cae449-f5c9-40da-b503-6e01691812b1:
+              id: c8cae449-f5c9-40da-b503-6e01691812b1
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: communityLists
+              label: Community Lists
+              description: Create Community Lists to be used to match on or set in a route-map below
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 33e9659f-c50d-41cf-a6a2-9af8b2c575ac
+                key: 25316a95-0fbf-4512-a3b2-261027ea47a2
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bd4e92d5-95de-49f2-a0f7-f742dabba090:
+              id: bd4e92d5-95de-49f2-a0f7-f742dabba090
+              type: INPUT_FIELD_TYPE_STRING
+              name: addressFamily
+              label: Address Family
+              description: Is this an IPv4 or IPv6 prefix-list?
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - ipv4
+                    - ipv6
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5c082560-eee3-42d0-aac7-45e183276029:
+              id: 5c082560-eee3-42d0-aac7-45e183276029
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Route Maps Group
+              description: Group of members for Route Maps
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - e8da8e92-1c94-4020-a00f-8dec939c0043
+                    - 64c75d5c-e67a-4255-9a18-734acd82a836
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            64c75d5c-e67a-4255-9a18-734acd82a836:
+              id: 64c75d5c-e67a-4255-9a18-734acd82a836
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: routeMap
+              label: Route Map
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 00e06746-a865-49c0-9e09-9270dcc4b944
+                key: 30538f64-6f00-4c0d-9bce-0514caaf0f37
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a613e93e-c5f5-459d-982c-30c3dd62771c:
+              id: a613e93e-c5f5-459d-982c-30c3dd62771c
+              type: INPUT_FIELD_TYPE_STRING
+              name: asPathRegexMode
+              label: AS Path Regex Mode
+              description: Specifies how EOS will evaluate AS-path regex in AS Path Access-Lists.  Default is asn.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: asn
+                static_options:
+                  values:
+                    - asn
+                    - string
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            33e9659f-c50d-41cf-a6a2-9af8b2c575ac:
+              id: 33e9659f-c50d-41cf-a6a2-9af8b2c575ac
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Community Lists Group
+              description: Group of members for Community Lists
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 25316a95-0fbf-4512-a3b2-261027ea47a2
+                    - 780d1884-af93-43a7-999c-a6b0a8846571
+                    - 08e714a9-d17d-4c1a-9cf7-8e29ceeb260b
+                    - ecf347d4-0d1b-4f0d-85e7-d72bce969eed
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9cb517bf-260b-45c6-8323-08309dfc90a4:
+              id: 9cb517bf-260b-45c6-8323-08309dfc90a4
+              type: INPUT_FIELD_TYPE_STRING
+              name: setIpNextHop
+              label: Set IP Next Hop
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - peer-address
+                    - unchanged
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            d6bf68b5-070d-408a-bd94-9126bba85c71:
+              id: d6bf68b5-070d-408a-bd94-9126bba85c71
+              type: INPUT_FIELD_TYPE_STRING
+              name: asPath
+              label: AS Path
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            95d2be2f-a05c-48cb-a57f-92dc5a996f62:
+              id: 95d2be2f-a05c-48cb-a57f-92dc5a996f62
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: sequenceNumber
+              label: Sequence Number
+              description: Unique sequence number in this prefix list.
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f30a64d1-65be-4180-9a0c-f06a7166b98e:
+              id: f30a64d1-65be-4180-9a0c-f06a7166b98e
+              type: INPUT_FIELD_TYPE_STRING
+              name: matchRouteType
+              label: Match Route Type
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - internal
+                    - external
+                    - local
+                    - vpn
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            88f400ca-b3ab-4c66-93d5-e8b1a385bdb3:
+              id: 88f400ca-b3ab-4c66-93d5-e8b1a385bdb3
+              type: INPUT_FIELD_TYPE_STRING
+              name: origin
+              label: Origin
+              description: Origin of the path
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: any
+                static_options:
+                  values:
+                    - any
+                    - egp
+                    - igp
+                    - incomplete
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            dd917338-223b-4608-ba69-0584a7d5a955:
+              id: dd917338-223b-4608-ba69-0584a7d5a955
+              type: INPUT_FIELD_TYPE_STRING
+              name: prefixListName
+              label: Prefix List Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ce201316-2372-4ff3-b608-f677193dfb41:
+              id: ce201316-2372-4ff3-b608-f677193dfb41
+              type: INPUT_FIELD_TYPE_STRING
+              name: setOrigin
+              label: Set Origin
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - incomplete
+                    - egp
+                    - igp
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            f462f9cb-2670-4083-9822-78719ac8dbf4:
+              id: f462f9cb-2670-4083-9822-78719ac8dbf4
+              type: INPUT_FIELD_TYPE_STRING
+              name: prefixRange
+              label: Match Range
+              description: Configure if the match is exact match or does it use eq, le, or ge to match the prefix
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: exact-route
+                static_options:
+                  values:
+                    - eq
+                    - ge
+                    - le
+                    - exact-route
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7be95b3b-543e-4cb7-8178-7e80d67181a3:
+              id: 7be95b3b-543e-4cb7-8178-7e80d67181a3
+              type: INPUT_FIELD_TYPE_STRING
+              name: community
+              label: Community
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            0cd682a3-0777-41b6-be04-d3373769726d:
+              id: 0cd682a3-0777-41b6-be04-d3373769726d
+              type: INPUT_FIELD_TYPE_STRING
+              name: prefixList
+              label: Match Prefix List
+              description: A prefix-list to match
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"dd917338-223b-4608-ba69-0584a7d5a955"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e8da8e92-1c94-4020-a00f-8dec939c0043:
+              id: e8da8e92-1c94-4020-a00f-8dec939c0043
+              type: INPUT_FIELD_TYPE_STRING
+              name: routeMapName
+              label: Route Map Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            4b47cad2-d480-411d-bbfa-9371201ff25a:
+              id: 4b47cad2-d480-411d-bbfa-9371201ff25a
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDeny
+              label: Permit Deny
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            039a3a2e-de3e-4321-b1d7-5bc9b3f9b01d:
+              id: 039a3a2e-de3e-4321-b1d7-5bc9b3f9b01d
+              type: INPUT_FIELD_TYPE_STRING
+              name: localPref
+              label: Set Local Pref
+              description: The Local Preference to set
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            5c09f3f8-1081-4a8a-946f-7d535d4a605f:
+              id: 5c09f3f8-1081-4a8a-946f-7d535d4a605f
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: prefixLists
+              label: Prefix Lists
+              description: Create Prefix Lists to use for matching in a route-map below.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 0d3a5e1a-3719-427a-a4c2-84ccaf3cd8a6
+                key: dd917338-223b-4608-ba69-0584a7d5a955
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7a4bc480-e8a7-4dc1-93b1-91b60f82fd01:
+              id: 7a4bc480-e8a7-4dc1-93b1-91b60f82fd01
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: noExport
+              label: No Export
+              description: Match on the no-export community
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            9e74336b-8196-423f-ab7e-a6be5a8a7ee7:
+              id: 9e74336b-8196-423f-ab7e-a6be5a8a7ee7
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: internet
+              label: Internet
+              description: Match on the internet community
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            56b7055a-0fe2-4592-83e5-1116010a4ba5:
+              id: 56b7055a-0fe2-4592-83e5-1116010a4ba5
+              type: INPUT_FIELD_TYPE_STRING
+              name: matchCommunity
+              label: Match Community List
+              description: Match a community list
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"25316a95-0fbf-4512-a3b2-261027ea47a2"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            82dcdbf4-ce40-4445-8e09-0c8693740ce1:
+              id: 82dcdbf4-ce40-4445-8e09-0c8693740ce1
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: asPathPrependRepeat
+              label: Set AS Path Prepend Repeat
+              description: The number of times to prepend the device's BGP AS in a set statement
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            fe0ffb9c-fed3-4657-871c-8e24957d12dd:
+              id: fe0ffb9c-fed3-4657-871c-8e24957d12dd
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: asPathAccessLists
+              label: AS Path Access-Lists
+              description: Create AS-Path Access Lists for matching in Route-maps below.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 5c745f63-1027-4fa2-a708-5628eb28f69a
+                key: acfef14c-61d3-4683-8534-c134e27c307d
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            8acb7aaf-6eff-4392-ad2a-640a36078482:
+              id: 8acb7aaf-6eff-4392-ad2a-640a36078482
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: routeMaps
+              label: Route Maps
+              description: Create Route-Maps that can be used in other studios.
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: 5c082560-eee3-42d0-aac7-45e183276029
+                key: e8da8e92-1c94-4020-a00f-8dec939c0043
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a0e22b02-3d18-4f41-9edc-a03eb9625f68:
+              id: a0e22b02-3d18-4f41-9edc-a03eb9625f68
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: noAdvertise
+              label: No Advertise
+              description: Match on the no-advertise community
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            2dbf00bb-0134-44f6-aa4a-d048daefe9d3:
+              id: 2dbf00bb-0134-44f6-aa4a-d048daefe9d3
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDeny
+              label: Action
+              description: Route Map Action (Permit or Deny)
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f:
+              id: e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: maskLength
+              label: Mask Length
+              description: Only required if Match Range is not exact-route.
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: 1..128
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            40661dd0-8246-46e7-817c-bf145a055f8c:
+              id: 40661dd0-8246-46e7-817c-bf145a055f8c
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: AS Path Access-List Entries Group
+              description: Group of members for AS Path Access-List Entries
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 97aecd72-91fb-482f-843e-ccb07fd5f219
+                    - d6bf68b5-070d-408a-bd94-9126bba85c71
+                    - 88f400ca-b3ab-4c66-93d5-e8b1a385bdb3
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            02e4e6f8-d132-4300-ab3d-072df28ee1cb:
+              id: 02e4e6f8-d132-4300-ab3d-072df28ee1cb
+              type: INPUT_FIELD_TYPE_GROUP
+              name: assignDevicesGroup
+              label: Assign Devices
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 5c09f3f8-1081-4a8a-946f-7d535d4a605f
+                    - c8cae449-f5c9-40da-b503-6e01691812b1
+                    - 8acb7aaf-6eff-4392-ad2a-640a36078482
+                    - a613e93e-c5f5-459d-982c-30c3dd62771c
+                    - fe0ffb9c-fed3-4657-871c-8e24957d12dd
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            4c95d90b-88ce-4df3-a7db-f3358ec2a1ec:
+              id: 4c95d90b-88ce-4df3-a7db-f3358ec2a1ec
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: localAs
+              label: Local AS
+              description: Match on the local-as community
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            88bccaa8-69bf-4e1f-9ce4-a426df1e944a:
+              id: 88bccaa8-69bf-4e1f-9ce4-a426df1e944a
+              type: INPUT_FIELD_TYPE_STRING
+              name: prefix
+              label: Prefix
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: cidr
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            00e06746-a865-49c0-9e09-9270dcc4b944:
+              id: 00e06746-a865-49c0-9e09-9270dcc4b944
+              type: INPUT_FIELD_TYPE_GROUP
+              name: value
+              label: Route Map Group
+              description: Group of members for Route Map
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 30538f64-6f00-4c0d-9bce-0514caaf0f37
+                    - 2dbf00bb-0134-44f6-aa4a-d048daefe9d3
+                    - 0cd682a3-0777-41b6-be04-d3373769726d
+                    - 8a8ca4cf-821c-4a1e-a347-803ed34919ea
+                    - dfad8ff8-7726-46c8-a482-8de079129241
+                    - 56b7055a-0fe2-4592-83e5-1116010a4ba5
+                    - a33498f4-da56-4183-9018-3b6689680e1c
+                    - b41e8bb6-6bfd-42bc-852c-f2b0a5e75e7c
+                    - 039a3a2e-de3e-4321-b1d7-5bc9b3f9b01d
+                    - 8c16d3f6-7680-459d-ad09-19c5b8b98d78
+                    - f30a64d1-65be-4180-9a0c-f06a7166b98e
+                    - 9cb517bf-260b-45c6-8323-08309dfc90a4
+                    - ce201316-2372-4ff3-b608-f677193dfb41
+                    - c23d2457-f512-46f8-a24a-c73757e498c4
+                    - 82dcdbf4-ce40-4445-8e09-0c8693740ce1
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            ecf347d4-0d1b-4f0d-85e7-d72bce969eed:
+              id: ecf347d4-0d1b-4f0d-85e7-d72bce969eed
+              type: INPUT_FIELD_TYPE_BOOLEAN
+              name: regex
+              label: Regex
+              description: Use a regular expression in the community list?
+              required: false
+              boolean_props:
+                default_value: false
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            7cb845ed-f3f8-440b-a954-1dd5d2ef2b53:
+              id: 7cb845ed-f3f8-440b-a954-1dd5d2ef2b53
+              type: INPUT_FIELD_TYPE_COLLECTION
+              name: prefixList
+              label: Prefix List
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props:
+                base_field_id: e794be28-a634-4671-ab6e-cd26b4905b81
+                key: 95d2be2f-a05c-48cb-a57f-92dc5a996f62
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            root:
+              id: root
+              type: INPUT_FIELD_TYPE_GROUP
+              name: ''
+              label: ''
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props: null
+              group_props:
+                members:
+                  values:
+                    - 8704d6bd-c4ea-463c-ac23-01c9edcc0a6c
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: null
+              tag_matcher_props: null
+            25316a95-0fbf-4512-a3b2-261027ea47a2:
+              id: 25316a95-0fbf-4512-a3b2-261027ea47a2
+              type: INPUT_FIELD_TYPE_STRING
+              name: communityListName
+              label: Community List Name
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            bd90d5eb-0b76-46bf-8bb7-d45e6c8f287b:
+              id: bd90d5eb-0b76-46bf-8bb7-d45e6c8f287b
+              type: INPUT_FIELD_TYPE_STRING
+              name: prefixListSeqAction
+              label: Action
+              description: Prefix list action (permit or deny)
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            30538f64-6f00-4c0d-9bce-0514caaf0f37:
+              id: 30538f64-6f00-4c0d-9bce-0514caaf0f37
+              type: INPUT_FIELD_TYPE_INTEGER
+              name: sequenceNumber
+              label: Sequence Number
+              description: Unique sequence number in this route-map.
+              required: false
+              boolean_props: null
+              integer_props:
+                default_value: null
+                static_options: null
+                range: null
+                dynamic_options: null
+                extra_values_allowed: false
+              float_props: null
+              string_props: null
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            a33498f4-da56-4183-9018-3b6689680e1c:
+              id: a33498f4-da56-4183-9018-3b6689680e1c
+              type: INPUT_FIELD_TYPE_STRING
+              name: setCommunity
+              label: Set Community
+              description: Community List to Set or enter a Community String
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options: null
+                dynamic_options:
+                  values:
+                    - '{"fieldId":"25316a95-0fbf-4512-a3b2-261027ea47a2"}'
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: true
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            780d1884-af93-43a7-999c-a6b0a8846571:
+              id: 780d1884-af93-43a7-999c-a6b0a8846571
+              type: INPUT_FIELD_TYPE_STRING
+              name: communityListType
+              label: Community List Type
+              description: Is this a standard, extended, or large  community list
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - standard
+                    - extended
+                    - large
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            97aecd72-91fb-482f-843e-ccb07fd5f219:
+              id: 97aecd72-91fb-482f-843e-ccb07fd5f219
+              type: INPUT_FIELD_TYPE_STRING
+              name: permitDeny
+              label: Permit Deny
+              description: ''
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: null
+                static_options:
+                  values:
+                    - permit
+                    - deny
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+            dfad8ff8-7726-46c8-a482-8de079129241:
+              id: dfad8ff8-7726-46c8-a482-8de079129241
+              type: INPUT_FIELD_TYPE_STRING
+              name: communityType
+              label: Community Type
+              description: This is used for both a match or set statement to determine if the Community List is standard or extended
+              required: false
+              boolean_props: null
+              integer_props: null
+              float_props: null
+              string_props:
+                default_value: standard
+                static_options:
+                  values:
+                    - standard
+                    - extended
+                    - large
+                dynamic_options: null
+                length: null
+                pattern: null
+                format: null
+                is_secret: false
+                extra_values_allowed: false
+              group_props: null
+              collection_props: null
+              resolver_props: null
+              auto_fill_action_id: ''
+              tag_matcher_props: null
+        layout:
+          value: '{"00e06746-a865-49c0-9e09-9270dcc4b944":{"key":"00e06746-a865-49c0-9e09-9270dcc4b944","type":"INPUT","order":["30538f64-6f00-4c0d-9bce-0514caaf0f37","c23d2457-f512-46f8-a24a-c73757e498c4","2dbf00bb-0134-44f6-aa4a-d048daefe9d3","8a8ca4cf-821c-4a1e-a347-803ed34919ea","0cd682a3-0777-41b6-be04-d3373769726d","dfad8ff8-7726-46c8-a482-8de079129241","56b7055a-0fe2-4592-83e5-1116010a4ba5","8c16d3f6-7680-459d-ad09-19c5b8b98d78","f30a64d1-65be-4180-9a0c-f06a7166b98e","a33498f4-da56-4183-9018-3b6689680e1c","b41e8bb6-6bfd-42bc-852c-f2b0a5e75e7c","039a3a2e-de3e-4321-b1d7-5bc9b3f9b01d","82dcdbf4-ce40-4445-8e09-0c8693740ce1","9cb517bf-260b-45c6-8323-08309dfc90a4","ce201316-2372-4ff3-b608-f677193dfb41"]},"e794be28-a634-4671-ab6e-cd26b4905b81":{"key":"e794be28-a634-4671-ab6e-cd26b4905b81","type":"INPUT","order":["95d2be2f-a05c-48cb-a57f-92dc5a996f62","bd90d5eb-0b76-46bf-8bb7-d45e6c8f287b","88bccaa8-69bf-4e1f-9ce4-a426df1e944a","f462f9cb-2670-4083-9822-78719ac8dbf4","e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f"]},"e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f":{"key":"e3dbd02a-7a8c-41ae-901b-9e2c4fbb7d4f","dependency":{"f462f9cb-2670-4083-9822-78719ac8dbf4":{"value":["eq","ge","le"],"mode":"SHOW"}},"type":"INPUT"},"c8cae449-f5c9-40da-b503-6e01691812b1":{"key":"c8cae449-f5c9-40da-b503-6e01691812b1","type":"INPUT","isPageLayout":true},"7a4bc480-e8a7-4dc1-93b1-91b60f82fd01":{"key":"7a4bc480-e8a7-4dc1-93b1-91b60f82fd01","type":"INPUT","dependency":{"780d1884-af93-43a7-999c-a6b0a8846571":{"value":["standard"],"mode":"SHOW"}}},"a0e22b02-3d18-4f41-9edc-a03eb9625f68":{"key":"a0e22b02-3d18-4f41-9edc-a03eb9625f68","type":"INPUT","dependency":{"780d1884-af93-43a7-999c-a6b0a8846571":{"value":["standard"],"mode":"SHOW"}}},"4c95d90b-88ce-4df3-a7db-f3358ec2a1ec":{"key":"4c95d90b-88ce-4df3-a7db-f3358ec2a1ec","type":"INPUT","dependency":{"780d1884-af93-43a7-999c-a6b0a8846571":{"value":["standard"],"mode":"SHOW"}}},"9e74336b-8196-423f-ab7e-a6be5a8a7ee7":{"key":"9e74336b-8196-423f-ab7e-a6be5a8a7ee7","type":"INPUT","dependency":{"780d1884-af93-43a7-999c-a6b0a8846571":{"value":["standard"],"mode":"SHOW"}}},"02e4e6f8-d132-4300-ab3d-072df28ee1cb":{"key":"02e4e6f8-d132-4300-ab3d-072df28ee1cb","type":"INPUT","order":["5c09f3f8-1081-4a8a-946f-7d535d4a605f","c8cae449-f5c9-40da-b503-6e01691812b1","a613e93e-c5f5-459d-982c-30c3dd62771c","fe0ffb9c-fed3-4657-871c-8e24957d12dd","8acb7aaf-6eff-4392-ad2a-640a36078482"]},"fe0ffb9c-fed3-4657-871c-8e24957d12dd":{"key":"fe0ffb9c-fed3-4657-871c-8e24957d12dd","type":"INPUT","isPageLayout":true},"64c75d5c-e67a-4255-9a18-734acd82a836":{"key":"64c75d5c-e67a-4255-9a18-734acd82a836","isPageLayout":false,"type":"INPUT"},"8acb7aaf-6eff-4392-ad2a-640a36078482":{"key":"8acb7aaf-6eff-4392-ad2a-640a36078482","type":"INPUT","isPageLayout":true},"5c09f3f8-1081-4a8a-946f-7d535d4a605f":{"key":"5c09f3f8-1081-4a8a-946f-7d535d4a605f","type":"INPUT","isPageLayout":true},"33e9659f-c50d-41cf-a6a2-9af8b2c575ac":{"key":"33e9659f-c50d-41cf-a6a2-9af8b2c575ac","type":"INPUT","order":["25316a95-0fbf-4512-a3b2-261027ea47a2","780d1884-af93-43a7-999c-a6b0a8846571","ecf347d4-0d1b-4f0d-85e7-d72bce969eed","08e714a9-d17d-4c1a-9cf7-8e29ceeb260b"]}}'
+      from_package: ''
